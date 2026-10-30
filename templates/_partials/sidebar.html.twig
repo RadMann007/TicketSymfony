@@ -1,0 +1,47 @@
+<div class="flex h-full flex-col">
+
+    {# Logo #}
+    <div class="flex h-16 items-center border-b px-6">
+        <a href="{{ path('ticket.index') }}" class="flex items-center gap-2 font-semibold">
+            <div class="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                <twig:ux:icon name="lucide:ticket" class="size-4" />
+            </div>
+            <span>Ticketphony</span>
+        </a>
+    </div>
+
+    {# Navigation #}
+    <nav class="flex-1 space-y-1 overflow-y-auto p-4">
+        {% set route = app.request.attributes.get('_route') %}
+
+        <a href="{{ path('ticket.index') }}"
+           class="flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors
+                  {{ route == 'ticket.index' ? 'bg-secondary text-secondary-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground' }}">
+            <twig:ux:icon name="lucide:list" class="size-4" />
+            Mes tickets
+        </a>
+
+        <a href="{{ path('ticket.new') }}"
+           class="flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors
+                  {{ route == 'ticket.new' ? 'bg-secondary text-secondary-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground' }}">
+            <twig:ux:icon name="lucide:plus" class="size-4" />
+            Nouveau ticket
+        </a>
+    </nav>
+
+    {# User + logout en bas #}
+    <div class="border-t p-4">
+        <div class="flex items-center gap-3">
+            <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium">
+                {{ app.user.userIdentifier|slice(0, 1)|upper }}
+            </div>
+            <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-medium">{{ app.user.userIdentifier }}</p>
+                <a href="{{ logout_path() }}" class="text-xs text-muted-foreground hover:text-foreground">
+                    Se déconnecter
+                </a>
+            </div>
+        </div>
+    </div>
+
+</div>

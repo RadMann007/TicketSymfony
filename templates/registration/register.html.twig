@@ -1,0 +1,123 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Inscription{% endblock %}
+
+{% block body %}
+    <div class="grid min-h-svh lg:grid-cols-2">
+
+        {# Colonne gauche : logo + formulaire #}
+        <div class="flex flex-col gap-4 p-6 md:p-10">
+
+            {# Logo / marque #}
+            <div class="flex justify-center gap-2 md:justify-start">
+                <a href="{{ path('ticket.index') }}" class="flex items-center gap-2 font-medium">
+                    <div class="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                        <twig:ux:icon name="lucide:ticket" class="size-4" />
+                    </div>
+                    Ticketphony
+                </a>
+            </div>
+
+            {# Formulaire centré #}
+            <div class="flex flex-1 items-center justify-center">
+                <div class="w-full max-w-xs">
+
+                    <div class="mb-8 text-center md:text-left">
+                        <h1 class="text-2xl font-bold tracking-tight">Créer un compte</h1>
+                        <p class="mt-2 text-sm text-muted-foreground">
+                            Rejoignez-nous pour gérer vos tickets.
+                        </p>
+                    </div>
+
+                    {# Erreurs globales (CSRF, etc.) #}
+                    {{ form_errors(registrationForm) }}
+
+                    {{ form_start(registrationForm) }}
+
+                        <div class="space-y-5">
+
+                            {# Email #}
+                            <div class="space-y-2">
+                                {{ form_label(registrationForm.email, null, {
+                                    label_attr: { class: 'text-sm font-medium leading-none' }
+                                }) }}
+                                <twig:Input
+                                    id="{{ registrationForm.email.vars.id }}"
+                                    name="{{ registrationForm.email.vars.full_name }}"
+                                    value="{{ registrationForm.email.vars.value }}"
+                                    type="email"
+                                    placeholder="mon@email.com"
+                                    autocomplete="email"
+                                    required
+                                    autofocus
+                                />
+                                {{ form_errors(registrationForm.email) }}
+                            </div>
+
+                            {# Mot de passe #}
+                            <div class="space-y-2">
+                                {{ form_label(registrationForm.plainPassword, null, {
+                                    label_attr: { class: 'text-sm font-medium leading-none' }
+                                }) }}
+                                <twig:Input
+                                    id="{{ registrationForm.plainPassword.vars.id }}"
+                                    name="{{ registrationForm.plainPassword.vars.full_name }}"
+                                    type="password"
+                                    placeholder="Au moins 6 caractères"
+                                    autocomplete="new-password"
+                                    required
+                                />
+                                {{ form_errors(registrationForm.plainPassword) }}
+                            </div>
+
+                            {# Agree terms #}
+                            <div class="space-y-2">
+                                <div class="flex items-start gap-2">
+                                    <twig:Checkbox
+                                        id="{{ registrationForm.agreeTerms.vars.id }}"
+                                        name="{{ registrationForm.agreeTerms.vars.full_name }}"
+                                        value="1"
+                                        :checked="registrationForm.agreeTerms.vars.checked"
+                                        class="mt-0.5"
+                                    />
+                                    {{ form_label(registrationForm.agreeTerms, "J'accepte les conditions d'utilisation", {
+                                        label_attr: { class: 'text-xs leading-tight cursor-pointer text-muted-foreground' }
+                                    }) }}
+                                </div>
+                                {{ form_errors(registrationForm.agreeTerms) }}
+                            </div>
+
+                        </div>
+
+                        {# Submit #}
+                        <twig:Button type="submit" class="mt-6 w-full">
+                            Créer mon compte
+                        </twig:Button>
+
+                        {# CSRF #}
+                        {{ form_widget(registrationForm._token) }}
+
+                    {{ form_end(registrationForm, { render_rest: false }) }}
+
+                    <p class="mt-6 text-center text-sm text-muted-foreground">
+                        Déjà un compte ?
+                        <a href="{{ path('app_login') }}" class="font-medium text-primary hover:underline">
+                            Se connecter
+                        </a>
+                    </p>
+
+                </div>
+            </div>
+        </div>
+
+        {# Colonne droite : image (masquée sur mobile) #}
+        <div class="relative hidden bg-muted lg:block">
+            <img
+                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR69uHpWRMBghmo2npZPcc1v0KihJ0MW_QlAdObiMwQaOjMNrYxvAacaY7A&s=10"
+                alt="Illustration"
+                class="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+            />
+        </div>
+
+    </div>
+{% endblock %}

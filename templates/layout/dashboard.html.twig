@@ -1,0 +1,139 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+    {% set route = app.request.attributes.get('_route') %}
+
+    {# Capture du bloc enfant AVANT le Provider (évite le conflit de slots) #}
+    {% set main_content %}
+        {% block page_content %}{% endblock %}
+    {% endset %}
+
+    <twig:Sidebar:Provider id="app-sidebar">
+
+        <twig:Sidebar collapsible="icon">
+
+            {# ─── Header : logo + team switcher ─── #}
+            <twig:Sidebar:Header>
+                <twig:Sidebar:Menu>
+                    <twig:Sidebar:MenuItem>
+
+                        <twig:DropdownMenu id="sidebar-team">
+                            <twig:DropdownMenu:Trigger asChild>
+                                <twig:Sidebar:MenuButton size="lg" tooltip="Ticketphony">
+                                    <div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                                        <twig:ux:icon name="lucide:command" class="size-4" aria-hidden="true" />
+                                    </div>
+                                    <div class="grid flex-1 text-left text-sm leading-tight">
+                                        <span class="truncate font-semibold">Ticketphony</span>
+                                        <span class="truncate text-xs text-muted-foreground">Mon espace</span>
+                                    </div>
+                                    <twig:ux:icon name="lucide:chevrons-up-down" class="ml-auto size-4" aria-hidden="true" />
+                                </twig:Sidebar:MenuButton>
+                            </twig:DropdownMenu:Trigger>
+
+                            <twig:DropdownMenu:Content side="top" class="w-56">
+                                <twig:DropdownMenu:Label>Espaces</twig:DropdownMenu:Label>
+                                <twig:DropdownMenu:Item>Ticketphony</twig:DropdownMenu:Item>
+                                <twig:DropdownMenu:Separator />
+                                <twig:DropdownMenu:Item>Ajouter un espace</twig:DropdownMenu:Item>
+                            </twig:DropdownMenu:Content>
+                        </twig:DropdownMenu>
+
+                    </twig:Sidebar:MenuItem>
+                </twig:Sidebar:Menu>
+            </twig:Sidebar:Header>
+
+            {# ─── Navigation ─── #}
+            <twig:Sidebar:Content>
+                <twig:Sidebar:Group>
+                    <twig:Sidebar:GroupLabel>Tickets</twig:Sidebar:GroupLabel>
+                    <twig:Sidebar:GroupContent>
+                        <twig:Sidebar:Menu>
+
+                            <twig:Sidebar:MenuItem>
+                                <twig:Sidebar:MenuButton as="a"
+                                                         href="{{ path('ticket.index') }}"
+                                                         :active="route == 'ticket.index'"
+                                                         tooltip="Mes tickets">
+                                    <twig:ux:icon name="lucide:list" aria-hidden="true" />
+                                    <span>Mes tickets</span>
+                                </twig:Sidebar:MenuButton>
+                            </twig:Sidebar:MenuItem>
+
+                            <twig:Sidebar:MenuItem>
+                                <twig:Sidebar:MenuButton as="a"
+                                                         href="{{ path('ticket.new') }}"
+                                                         :active="route == 'ticket.new'"
+                                                         tooltip="Nouveau ticket">
+                                    <twig:ux:icon name="lucide:plus" aria-hidden="true" />
+                                    <span>Nouveau ticket</span>
+                                </twig:Sidebar:MenuButton>
+                            </twig:Sidebar:MenuItem>
+
+                        </twig:Sidebar:Menu>
+                    </twig:Sidebar:GroupContent>
+                </twig:Sidebar:Group>
+            </twig:Sidebar:Content>
+
+            {# ─── Footer : user + logout ─── #}
+            {# ─── Footer : user + logout ─── #}
+<twig:Sidebar:Footer>
+    <details class="group relative">
+
+        {# Bouton user (= summary natif, cliquable) #}
+        <summary class="flex w-full cursor-pointer list-none items-center gap-2 rounded-md p-2 transition-colors hover:bg-accent [&::-webkit-details-marker]:hidden">
+            <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                {{ app.user.userIdentifier|slice(0, 1)|upper }}
+            </div>
+            <div class="grid flex-1 text-left text-sm leading-tight">
+                <span class="truncate font-semibold">{{ app.user.userIdentifier }}</span>
+                <span class="truncate text-xs text-muted-foreground">Connecté</span>
+            </div>
+            <twig:ux:icon name="lucide:chevrons-up-down" class="ml-auto size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+        </summary>
+
+        {# Menu (s'ouvre au-dessus du bouton) #}
+        <div class="absolute bottom-full left-0 right-0 z-50 mb-2 rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+
+            <div class="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                Mon compte
+            </div>
+
+            <div class="flex items-center gap-2 px-2 py-1.5 text-sm">
+                <twig:ux:icon name="lucide:user" class="size-4" />
+                <span class="truncate">{{ app.user.userIdentifier }}</span>
+            </div>
+
+            <div class="-mx-1 my-1 h-px bg-border"></div>
+
+            <a href="{{ logout_path() }}"
+               class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground">
+                <twig:ux:icon name="lucide:log-out" class="size-4" />
+                <span>Se déconnecter</span>
+            </a>
+
+        </div>
+    </details>
+</twig:Sidebar:Footer>
+
+            <twig:Sidebar:Rail />
+        </twig:Sidebar>
+
+        {# ─── Zone principale ─── #}
+        <main class="flex min-w-0 flex-1 flex-col bg-background">
+
+            <header class="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+                <twig:Sidebar:Trigger>
+                    <twig:ux:icon name="lucide:panel-left" class="size-5" aria-hidden="true" />
+                </twig:Sidebar:Trigger>
+                <span class="text-sm font-medium text-muted-foreground">Ticketphony</span>
+            </header>
+
+            <div class="min-w-0 flex-1 overflow-auto">
+                {{ main_content|raw }}
+            </div>
+
+        </main>
+
+    </twig:Sidebar:Provider>
+{% endblock %}

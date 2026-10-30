@@ -1,0 +1,128 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Connexion{% endblock %}
+
+{% block body %}
+    <div class="grid min-h-svh lg:grid-cols-2">
+
+        {# Colonne gauche : logo + formulaire #}
+        <div class="flex flex-col gap-4 p-6 md:p-10">
+
+            {# Logo / marque #}
+            <div class="flex justify-center gap-2 md:justify-start">
+                <a href="{{ path('ticket.index') }}" class="flex items-center gap-2 font-medium">
+                    <div class="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                        <twig:ux:icon name="lucide:ticket" class="size-4" />
+                    </div>
+                    Ticketphony
+                </a>
+            </div>
+
+            {# Formulaire centré #}
+            <div class="flex flex-1 items-center justify-center">
+                <div class="w-full max-w-xs">
+
+                    <div class="mb-8 text-center md:text-left">
+                        <h1 class="text-2xl font-bold tracking-tight">Bon retour !</h1>
+                        <p class="mt-2 text-sm text-muted-foreground">
+                            Connectez-vous pour accéder à vos tickets.
+                        </p>
+                    </div>
+
+                    {# Déjà connecté #}
+                    {% if app.user %}
+                        <div class="mb-6 flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
+                            <span>Connecté : <strong>{{ app.user.userIdentifier }}</strong></span>
+                            <a href="{{ logout_path() }}" class="font-medium underline">Sortir</a>
+                        </div>
+                    {% endif %}
+
+                    {# Erreur d'authentification #}
+                    {% if error %}
+                        <div class="mb-6 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                            <twig:ux:icon name="lucide:alert-circle" class="mt-0.5 size-4 shrink-0" />
+                            <span>{{ error.messageKey|trans(error.messageData, 'security') }}</span>
+                        </div>
+                    {% endif %}
+
+                    <form method="post" class="space-y-5">
+
+                        {# Email #}
+                        <div class="space-y-2">
+                            <label for="inputEmail" class="text-sm font-medium leading-none">
+                                Email
+                            </label>
+                            <twig:Input
+                                id="inputEmail"
+                                name="email"
+                                type="email"
+                                value="{{ last_username }}"
+                                placeholder="mon@email.com"
+                                autocomplete="email"
+                                required
+                                autofocus
+                            />
+                        </div>
+
+                        {# Mot de passe #}
+                        <div class="space-y-2">
+                            <label for="inputPassword" class="text-sm font-medium leading-none">
+                                Mot de passe
+                            </label>
+                            <twig:Input
+                                id="inputPassword"
+                                name="password"
+                                type="password"
+                                placeholder="••••••••"
+                                autocomplete="current-password"
+                                required
+                            />
+                        </div>
+
+                        {# Remember me #}
+                        <div class="flex items-center gap-2">
+                            <twig:Checkbox
+                                id="remember_me"
+                                name="_remember_me"
+                                value="1"
+                            />
+                            <label for="remember_me" class="text-sm cursor-pointer">
+                                Se souvenir de moi
+                            </label>
+                        </div>
+
+                        {# CSRF #}
+                        <input type="hidden"
+                               name="_csrf_token"
+                               value="{{ csrf_token('authenticate') }}"
+                               data-controller="csrf-protection">
+
+                        {# Submit #}
+                        <twig:Button type="submit" class="w-full">
+                            Se connecter
+                        </twig:Button>
+
+                    </form>
+
+                    <p class="mt-6 text-center text-sm text-muted-foreground">
+                        Pas de compte ?
+                        <a href="{{ path('app_register') }}" class="font-medium text-primary hover:underline">
+                            Créer un compte
+                        </a>
+                    </p>
+
+                </div>
+            </div>
+        </div>
+
+        {# Colonne droite : image (masquée sur mobile) #}
+        <div class="relative hidden bg-muted lg:block">
+            <img
+                src="https://www.givainc.com/images/help_desk_ticket_examples.png"
+                alt="Illustration"
+                class="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+            />
+        </div>
+
+    </div>
+{% endblock %}

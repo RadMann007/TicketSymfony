@@ -1,0 +1,221 @@
+{% extends 'layout/dashboard.html.twig' %}
+
+{% block title %}Liste des tickets{% endblock %}
+
+{% block page_content %}
+    <div class="mx-auto w-full max-w-5xl px-4 py-10">
+
+        {# Messages flash #}
+        {% for message in app.flashes('success') %}
+            <div class="grid w-full max-w-md items-start gap-4">
+                <twig:Alert class="mb-6 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                    <twig:ux:icon name="lucide:info" />
+                    <twig:Alert:Title>Message</twig:Alert:Title>
+                    <twig:Alert:Description>
+                        {{ message }}
+                    </twig:Alert:Description>
+                </twig:Alert>
+            </div>
+        {% endfor %}
+
+        {# En-tête #}
+        <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h1 class="text-3xl font-bold tracking-tight">Tickets</h1>
+                <p class="mt-2 text-sm text-muted-foreground">
+                    {{ ticketList|length }} ticket{{ ticketList|length > 1 ? 's' : '' }}
+                    {% if q %}trouvé{{ ticketList|length > 1 ? 's' : '' }} pour « {{ q }} »{% else %}au total{% endif %}
+                </p>
+            </div>
+            <twig:Button as="a" href="{{ path('ticket.new') }}" variant="default">
+                <twig:ux:icon name="lucide:plus" class="mr-2 size-4" />
+                Créer un ticket
+            </twig:Button>
+        </div>
+
+        {# Recherche #}
+        <form method="get" action="{{ path('ticket.index') }}" class="mb-6 flex flex-wrap items-center gap-2">
+            <div class="relative flex-1 min-w-64">
+                <twig:ux:icon name="lucide:search"
+                              class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <twig:Input
+                    name="q"
+                    value="{{ q }}"
+                    placeholder="Rechercher par nom ou commentaire..."
+                    class="pl-9"
+                />
+            </div>
+            <twig:Button type="submit" variant="outline">Rechercher</twig:Button>
+            {% if q %}
+                <twig:Button as="a" href="{{ path('ticket.index') }}" variant="ghost">
+                    <twig:ux:icon name="lucide:x" class="mr-2 size-4" />
+                    Effacer
+                </twig:Button>
+            {% endif %}
+        </form>
+
+        {# Tableau #}
+        <div class="overflow-hidden rounded-xl border bg-card shadow-sm">
+            <twig:Table>
+                <twig:Table:Caption class="sr-only">Liste des tickets</twig:Table:Caption>
+
+                <twig:Table:Header>
+                    <twig:Table:Row>
+                        <twig:Table:Head class="w-16">#</twig:Table:Head>
+                        <twig:Table:Head>Nom</twig:Table:Head>
+                        <twig:Table:Head class="w-32">Statut</twig:Table:Head>
+                        <twig:Table:Head class="w-32">Commentaire</twig:Table:Head>
+                        <twig:Table:Head class="w-32">Utilisateur</twig:Table:Head>
+                        <twig:Table:Head class="w-48">Créé le</twig:Table:Head>
+                        <twig:Table:Head class="w-24 text-right">Actions</twig:Table:Head>
+                    </twig:Table:Row>
+                </twig:Table:Header>
+
+                <twig:Table:Body>
+                    {% for ticket in ticketList %}
+                        <twig:Table:Row>
+                            <twig:Table:Cell class="font-mono text-xs text-muted-foreground">
+                                {{ ticket.id }}
+                            </twig:Table:Cell>
+                            <twig:Table:Cell class="font-medium">
+                                {{ ticket.name }}
+                            </twig:Table:Cell>
+
+                            {# ⬇️ CELLULE STATUT — maintenant cliquable ⬇️ #}
+                            <twig:Table:Cell>
+                                {% if ticket.owner == app.user %}
+                                    <form method="post"
+                                          action="{{ path('ticket.toggle', {id: ticket.id}) }}"
+                                          class="inline">
+                                        <input type="hidden" name="_token"
+                                               value="{{ csrf_token('toggle' ~ ticket.id) }}">
+                                        {% if q %}
+                                            <input type="hidden" name="_q" value="{{ q }}">
+                                        {% endif %}
+                                        <button type="submit"
+                                                class="cursor-pointer border-0 bg-transparent p-0 transition-opacity hover:opacity-80"
+                                                title="Cliquer pour changer le statut">
+                                            {% if ticket.isDone %}
+                                                <twig:Badge variant="success">Terminé</twig:Badge>
+                                            {% else %}
+                                                <twig:Badge variant="warning">En cours</twig:Badge>
+                                            {% endif %}
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    {% if ticket.isDone %}
+                                        <twig:Badge variant="success">Terminé</twig:Badge>
+                                    {% else %}
+                                        <twig:Badge variant="warning">En cours</twig:Badge>
+                                    {% endif %}
+                                {% endif %}
+                            </twig:Table:Cell>
+
+                            <twig:Table:Cell class="text-sm text-muted-foreground">
+                                {{ ticket.comment ? ticket.comment : '-' }}
+                            </twig:Table:Cell>
+                            <twig:Table:Cell class="text-sm text-muted-foreground">
+                                {{ ticket.owner.email }}
+                            </twig:Table:Cell>
+                            <twig:Table:Cell class="text-sm text-muted-foreground">
+                                {{ ticket.createdAt|date('d/m/Y à H:i') }}
+                            </twig:Table:Cell>
+                            <twig:Table:Cell>
+                                <div class="flex items-center justify-end gap-1">
+
+                                    {% if ticket.owner == app.user %}
+
+                                        {# Éditer #}
+                                        <twig:Button as="a" href="{{ path('ticket.edit', {id: ticket.id}) }}"
+                                                     variant="ghost" size="icon" title="Modifier">
+                                            <twig:ux:icon name="lucide:pencil" class="size-4" />
+                                        </twig:Button>
+
+                                        {# Supprimer #}
+                                        <twig:AlertDialog id="delete-dialog-{{ ticket.id }}">
+                                            <twig:AlertDialog:Trigger>
+                                                <twig:Button variant="ghost" size="icon" title="Supprimer"
+                                                             class="text-destructive hover:text-destructive"
+                                                             {{ ...alert_dialog_trigger_attrs }}>
+                                                    <twig:ux:icon name="lucide:trash-2" class="size-4" />
+                                                </twig:Button>
+                                            </twig:AlertDialog:Trigger>
+
+                                            <twig:AlertDialog:Content>
+                                                <twig:AlertDialog:Header>
+                                                    <twig:AlertDialog:Title>Supprimer ce ticket ?</twig:AlertDialog:Title>
+                                                    <twig:AlertDialog:Description>
+                                                        Cette action est <strong>irréversible</strong>. Le ticket
+                                                        « {{ ticket.name }} » sera définitivement supprimé.
+                                                    </twig:AlertDialog:Description>
+                                                </twig:AlertDialog:Header>
+
+                                                <twig:AlertDialog:Footer>
+                                                    <form method="post"
+                                                          action="{{ path('ticket.delete', {id: ticket.id}) }}"
+                                                          class="flex w-full justify-end gap-2">
+                                                        <input type="hidden" name="_token"
+                                                               value="{{ csrf_token('delete' ~ ticket.id) }}">
+
+                                                        <twig:AlertDialog:Cancel>Annuler</twig:AlertDialog:Cancel>
+
+                                                        <twig:AlertDialog:Action type="submit"
+                                                            class="bg-destructive text-white hover:bg-destructive/90">
+                                                            Oui, supprimer
+                                                        </twig:AlertDialog:Action>
+                                                    </form>
+                                                </twig:AlertDialog:Footer>
+                                            </twig:AlertDialog:Content>
+                                        </twig:AlertDialog>
+
+                                    {% else %}
+
+                                        {# Boutons grisés — non owner #}
+                                        <span title="Vous n'êtes pas le propriétaire de ce ticket">
+                                            <twig:Button variant="ghost" size="icon" disabled
+                                                         class="cursor-not-allowed opacity-40">
+                                                <twig:ux:icon name="lucide:pencil" class="size-4" />
+                                            </twig:Button>
+                                        </span>
+                                        <span title="Vous n'êtes pas le propriétaire de ce ticket">
+                                            <twig:Button variant="ghost" size="icon" disabled
+                                                         class="cursor-not-allowed opacity-40">
+                                                <twig:ux:icon name="lucide:trash-2" class="size-4" />
+                                            </twig:Button>
+                                        </span>
+
+                                    {% endif %}
+
+                                </div>
+                            </twig:Table:Cell>
+                        </twig:Table:Row>
+                    {% else %}
+                        <twig:Table:Row>
+                            <twig:Table:Cell colspan="7" class="py-12 text-center">
+                                <div class="flex flex-col items-center gap-3">
+                                    {% if q %}
+                                        <twig:ux:icon name="lucide:search-x" class="size-12 text-muted-foreground/50" />
+                                        <p class="text-sm text-muted-foreground">
+                                            Aucun ticket ne correspond à « <strong>{{ q }}</strong> ».
+                                        </p>
+                                        <twig:Button as="a" href="{{ path('ticket.index') }}" variant="outline" size="sm">
+                                            <twig:ux:icon name="lucide:x" class="mr-2 size-4" />
+                                            Effacer la recherche
+                                        </twig:Button>
+                                    {% else %}
+                                        <twig:ux:icon name="lucide:inbox" class="size-12 text-muted-foreground/50" />
+                                        <p class="text-sm text-muted-foreground">Aucun ticket pour le moment.</p>
+                                        <twig:Button as="a" href="{{ path('ticket.new') }}" variant="outline" size="sm">
+                                            <twig:ux:icon name="lucide:plus" class="mr-2 size-4" />
+                                            Créer le premier ticket
+                                        </twig:Button>
+                                    {% endif %}
+                                </div>
+                            </twig:Table:Cell>
+                        </twig:Table:Row>
+                    {% endfor %}
+                </twig:Table:Body>
+            </twig:Table>
+        </div>
+    </div>
+{% endblock %}

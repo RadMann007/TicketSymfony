@@ -1,0 +1,79 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+    {% set route = app.request.attributes.get('_route') %}
+
+    <div class="flex min-h-svh">
+
+        Mon super sidebar ici:
+        <twig:Sidebar:Provider>
+            <twig:Sidebar>
+                
+            </twig:Sidebar>
+        </twig:Sidebar:Provider>
+
+        {# Sidebar — HTML pur avec les classes shadcn #}
+        <aside class="flex w-64 shrink-0 flex-col border-r bg-background">
+
+            {# Header : logo #}
+            <div class="flex h-16 items-center border-b px-4">
+                <a href="{{ path('ticket.index') }}" class="flex items-center gap-2 font-semibold">
+                    <div class="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                        <twig:ux:icon name="lucide:ticket" class="size-4" />
+                    </div>
+                    <span>Ticketphony</span>
+                </a>
+            </div>
+
+            {# Navigation #}
+            <nav class="flex-1 space-y-1 overflow-y-auto p-3">
+                <p class="px-2 py-1 text-xs font-medium text-muted-foreground">Application</p>
+
+                <a href="{{ path('ticket.index') }}"
+                   class="flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors
+                          {{ route == 'ticket.index' ? 'bg-secondary text-secondary-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground' }}">
+                    <twig:ux:icon name="lucide:list" class="size-4 shrink-0" />
+                    <span>Mes tickets</span>
+                </a>
+
+                <a href="{{ path('ticket.new') }}"
+                   class="flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors
+                          {{ route == 'ticket.new' ? 'bg-secondary text-secondary-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground' }}">
+                    <twig:ux:icon name="lucide:plus" class="size-4 shrink-0" />
+                    <span>Nouveau ticket</span>
+                </a>
+            </nav>
+
+            {# Footer : user #}
+            <div class="border-t p-3">
+                <div class="flex items-center gap-3">
+                    <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                        {{ app.user.userIdentifier|slice(0, 1)|upper }}
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium">{{ app.user.userIdentifier }}</p>
+                        <a href="{{ logout_path() }}" class="text-xs text-muted-foreground hover:text-foreground">
+                            Se déconnecter
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+        {# Zone principale #}
+        <main class="flex min-w-0 flex-1 flex-col bg-background">
+
+            <header class="flex h-14 shrink-0 items-center border-b px-4">
+                <span class="text-sm font-medium text-muted-foreground">Ticketphony</span>
+            </header>
+
+            <div class="min-w-0 flex-1 overflow-auto">
+                {# ⬇️ Bloc Twig normal — héritage fonctionnel #}
+                {% block page_content %}{% endblock %}
+            </div>
+
+        </main>
+
+    </div>
+{% endblock %}

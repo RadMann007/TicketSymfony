@@ -1,0 +1,92 @@
+{# {% extends 'base.html.twig' %} #}
+{% extends 'layout/dashboard.html.twig' %}
+
+{% block title %}Modifier un ticket{% endblock %}
+
+{% block page_content %}
+    <div class="mx-auto max-w-md px-4 py-10">
+
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold tracking-tight">Modifier le ticket</h1>
+            <p class="mt-2 text-sm text-muted-foreground">
+                Ticket #{{ ticket.id }} — créé le {{ ticket.createdAt|date('d/m/Y à H:i') }}
+            </p>
+        </div>
+
+        {% for message in app.flashes('success') %}
+            <div class="mb-6 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                <span class="text-lg leading-none">✅</span>
+                <span>{{ message }}</span>
+            </div>
+        {% endfor %}
+
+        <div class="rounded-xl border bg-card p-6 shadow-sm">
+            {{ form_start(form) }}
+
+                <div class="mb-5 space-y-2">
+                    {{ form_label(form.name, null, {
+                        label_attr: { class: 'text-sm font-medium leading-none' }
+                    }) }}
+
+                    <twig:Input
+                    id="{{form.name.vars.id}}"
+                    placeholder="Titre"
+                    value="{{form.name.vars.value}}"
+                    name="{{form.name.vars.full_name}}"
+                     />
+                    {# {{ form_widget(form.name, {
+                        attr: {
+                            class: 'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                            placeholder: 'Décrivez votre ticket...'
+                        }
+                    }) }} #}
+
+                    
+
+                    {{ form_errors(form.name) }}
+                </div>
+
+                <div class="mb-5 space-y-2">
+                    <twig:Textarea
+                    id="{{ form.comment.vars.id}}"
+                    name="{{form.comment.vars.full_name}}"
+                    placeholder="Votre message"
+                    rows="4"
+                     >
+                     {{form.comment.vars.value}}
+                     </twig:Textarea>
+
+                     {{ form_errors(form.comment) }}
+                </div>
+
+                <div class="mb-6">
+                    <twig:Field:Group>
+                        <twig:Field orientation="horizontal">
+                            <twig:Checkbox
+                                id="{{ form.isDone.vars.id }}"
+                                name="{{ form.isDone.vars.full_name }}"
+                                value="1"
+                                :checked="form.isDone.vars.checked"
+                            />
+                            <twig:Field:Label for="{{ form.isDone.vars.id }}">
+                                Marquer comme terminé
+                            </twig:Field:Label>
+                        </twig:Field>
+                    </twig:Field:Group>
+                    {{ form_errors(form.isDone) }}
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <twig:Button type="submit" variant="default">
+                        Enregistrer les modifications
+                    </twig:Button>
+                    <twig:Button as="a" href="{{ path('ticket.index') }}" variant="outline">
+                        Annuler
+                    </twig:Button>
+                </div>
+
+                {{ form_widget(form._token) }}
+            {{ form_end(form, {render_rest: false}) }}
+        </div>
+    </div>
+{% endblock %}
