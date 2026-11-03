@@ -23,8 +23,8 @@
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">Tickets</h1>
                 <p class="mt-2 text-sm text-muted-foreground">
-                    {{ ticketList|length }} ticket{{ ticketList|length > 1 ? 's' : '' }}
-                    {% if q %}trouvé{{ ticketList|length > 1 ? 's' : '' }} pour « {{ q }} »{% else %}au total{% endif %}
+                    {{ pagination.getTotalItemCount() }} ticket{{ pagination.getTotalItemCount() > 1 ? 's' : '' }}
+                    {% if q %}trouvé{{ pagination.getTotalItemCount() > 1 ? 's' : '' }} pour « {{ q }} »{% else %}au total{% endif %}
                 </p>
             </div>
             <twig:Button as="a" href="{{ path('ticket.new') }}" variant="default">
@@ -72,7 +72,7 @@
                 </twig:Table:Header>
 
                 <twig:Table:Body>
-                    {% for ticket in ticketList %}
+                    {% for ticket in pagination %}
                         <twig:Table:Row>
                             <twig:Table:Cell class="font-mono text-xs text-muted-foreground">
                                 {{ ticket.id }}
@@ -217,5 +217,40 @@
                 </twig:Table:Body>
             </twig:Table>
         </div>
+
+        {# Pagination (shadcn) #}
+        {% if pagination.paginationData.pageCount > 1 %}
+            <div class="mt-6 flex justify-center">
+                <twig:Pagination>
+                    <twig:Pagination:Content>
+                        <twig:Pagination:Item>
+                            {% if pagination.paginationData.previous is defined %}
+                                <twig:Pagination:Previous href="{{ path('ticket.index', {page: pagination.paginationData.previous, q: q}) }}" />
+                            {% else %}
+                                <twig:Pagination:Previous href="#" class="pointer-events-none opacity-50" />
+                            {% endif %}
+                        </twig:Pagination:Item>
+
+                        {% for page in pagination.paginationData.pagesInRange %}
+                            <twig:Pagination:Item>
+                                {% if page == pagination.currentPageNumber %}
+                                    <twig:Pagination:Link href="{{ path('ticket.index', {page: page, q: q}) }}" active>{{ page }}</twig:Pagination:Link>
+                                {% else %}
+                                    <twig:Pagination:Link href="{{ path('ticket.index', {page: page, q: q}) }}">{{ page }}</twig:Pagination:Link>
+                                {% endif %}
+                            </twig:Pagination:Item>
+                        {% endfor %}
+
+                        <twig:Pagination:Item>
+                            {% if pagination.paginationData.next is defined %}
+                                <twig:Pagination:Next href="{{ path('ticket.index', {page: pagination.paginationData.next, q: q}) }}" />
+                            {% else %}
+                                <twig:Pagination:Next href="#" class="pointer-events-none opacity-50" />
+                            {% endif %}
+                        </twig:Pagination:Item>
+                    </twig:Pagination:Content>
+                </twig:Pagination>
+            </div>
+        {% endif %}
     </div>
 {% endblock %}
