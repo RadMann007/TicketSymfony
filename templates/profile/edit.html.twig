@@ -1,0 +1,77 @@
+{% extends 'layout/dashboard.html.twig' %}
+
+{% block title %}Mon profil{% endblock %}
+
+{% block page_content %}
+    <div class="mx-auto max-w-md px-4 py-10">
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold tracking-tight">Mon profil</h1>
+            <p class="mt-2 text-sm text-muted-foreground">
+                Modifiez vos informations de compte.
+            </p>
+        </div>
+
+        {% for message in app.flashes('success') %}
+            <div class="mb-6 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                <span class="text-lg leading-none">✅</span>
+                <span>{{ message }}</span>
+            </div>
+        {% endfor %}
+
+        <div class="rounded-xl border bg-card p-6 shadow-sm">
+            {{ form_start(form) }}
+
+                <div class="mb-5 space-y-2">
+                    {{ form_label(form.email, null, {
+                        label_attr: { class: 'text-sm font-medium leading-none' }
+                    }) }}
+                    <twig:Input
+                        id="{{ form.email.vars.id }}"
+                        name="{{ form.email.vars.full_name }}"
+                        type="email"
+                        value="{{ form.email.vars.value }}"
+                        placeholder="mon@email.com"
+                    />
+                    {{ form_errors(form.email) }}
+                </div>
+
+                <div class="mb-5 space-y-2">
+                    {{ form_label(form.plainPassword.first, null, {
+                        label_attr: { class: 'text-sm font-medium leading-none' }
+                    }) }}
+                    <twig:Input
+                        id="{{ form.plainPassword.first.vars.id }}"
+                        name="{{ form.plainPassword.first.vars.full_name }}"
+                        type="password"
+                        placeholder="••••••••"
+                    />
+                    {{ form_errors(form.plainPassword.first) }}
+                </div>
+
+                <div class="mb-5 space-y-2">
+                    {{ form_label(form.plainPassword.second, null, {
+                        label_attr: { class: 'text-sm font-medium leading-none' }
+                    }) }}
+                    <twig:Input
+                        id="{{ form.plainPassword.second.vars.id }}"
+                        name="{{ form.plainPassword.second.vars.full_name }}"
+                        type="password"
+                        placeholder="••••••••"
+                    />
+                    {{ form_errors(form.plainPassword.second) }}
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <twig:Button type="submit" variant="default">
+                        Enregistrer
+                    </twig:Button>
+                    <twig:Button as="a" href="{{ path('ticket.index') }}" variant="outline">
+                        Retour
+                    </twig:Button>
+                </div>
+
+                {{ form_widget(form._token) }}
+            {{ form_end(form, {render_rest: false}) }}
+        </div>
+    </div>
+{% endblock %}

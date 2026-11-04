@@ -1,0 +1,59 @@
+{% extends 'layout/dashboard.html.twig' %}
+
+{% block title %}Gestion des utilisateurs{% endblock %}
+
+{% block page_content %}
+    <div class="mx-auto w-full max-w-5xl px-4 py-10">
+        <h1 class="text-3xl font-bold tracking-tight mb-6">Utilisateurs</h1>
+
+        {% for message in app.flashes('success') %}
+            <div class="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">{{ message }}</div>
+        {% endfor %}
+        {% for message in app.flashes('error') %}
+            <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ message }}</div>
+        {% endfor %}
+
+        <div class="overflow-hidden rounded-xl border bg-card shadow-sm">
+            <table class="w-full text-sm">
+                <thead class="border-b bg-muted/50">
+                    <tr>
+                        <th class="px-4 py-3 text-left">#</th>
+                        <th class="px-4 py-3 text-left">Email</th>
+                        <th class="px-4 py-3 text-left">Rôles</th>
+                        <th class="px-4 py-3 text-left">Tickets</th>
+                        <th class="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                        <tr class="border-b last:border-0">
+                            <td class="px-4 py-3">{{ user.id }}</td>
+                            <td class="px-4 py-3">{{ user.email }}</td>
+                            <td class="px-4 py-3 flex flex-wrap gap-1">
+                                {% for role in user.roles %}
+                                    {% if role == 'ROLE_ADMIN' %}
+                                        <twig:Badge variant="destructive">{{ role }}</twig:Badge>
+                                    {% else %}
+                                        <twig:Badge variant="secondary">{{ role }}</twig:Badge>
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td class="px-4 py-3">{{ user.tickets|length }}</td>
+                            <td class="px-4 py-3 text-right">
+                                <a href="{{ path('admin.user.edit', {id: user.id}) }}" class="text-primary hover:underline mr-3">Rôles</a>
+                                {% if user != app.user %}
+                                    <form method="post" action="{{ path('admin.user.delete', {id: user.id}) }}" class="inline">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete_user' ~ user.id) }}">
+                                        <button type="submit" class="text-destructive hover:underline">Supprimer</button>
+                                    </form>
+                                {% else %}
+                                    <span class="text-muted-foreground">Vous</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

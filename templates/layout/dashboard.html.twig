@@ -73,6 +73,25 @@
                         </twig:Sidebar:Menu>
                     </twig:Sidebar:GroupContent>
                 </twig:Sidebar:Group>
+
+                {% if is_granted('ROLE_ADMIN') %}
+                    <twig:Sidebar:Group>
+                        <twig:Sidebar:GroupLabel>Administration</twig:Sidebar:GroupLabel>
+                        <twig:Sidebar:GroupContent>
+                            <twig:Sidebar:Menu>
+                                <twig:Sidebar:MenuItem>
+                                    <twig:Sidebar:MenuButton as="a"
+                                                             href="{{ path('admin.user.index') }}"
+                                                             :active="route starts with 'admin.user.'"
+                                                             tooltip="Gestion des utilisateurs">
+                                        <twig:ux:icon name="lucide:users" aria-hidden="true" />
+                                        <span>Utilisateurs</span>
+                                    </twig:Sidebar:MenuButton>
+                                </twig:Sidebar:MenuItem>
+                            </twig:Sidebar:Menu>
+                        </twig:Sidebar:GroupContent>
+                    </twig:Sidebar:Group>
+                {% endif %}
             </twig:Sidebar:Content>
 
             {# ─── Footer : user + logout ─── #}
@@ -103,6 +122,14 @@
                 <twig:ux:icon name="lucide:user" class="size-4" />
                 <span class="truncate">{{ app.user.userIdentifier }}</span>
             </div>
+
+            <div class="-mx-1 my-1 h-px bg-border"></div>
+
+            <a href="{{ path('profile.edit') }}"
+               class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground">
+                <twig:ux:icon name="lucide:user-cog" class="size-4" />
+                <span>Mon profil</span>
+            </a>
 
             <div class="-mx-1 my-1 h-px bg-border"></div>
 
