@@ -52,6 +52,16 @@
 
                             <twig:Sidebar:MenuItem>
                                 <twig:Sidebar:MenuButton as="a"
+                                                         href="{{ path('dashboard.index') }}"
+                                                         :active="route == 'dashboard.index'"
+                                                         tooltip="Tableau de bord">
+                                    <twig:ux:icon name="lucide:layout-dashboard" aria-hidden="true" />
+                                    <span>Tableau de bord</span>
+                                </twig:Sidebar:MenuButton>
+                            </twig:Sidebar:MenuItem>
+
+                            <twig:Sidebar:MenuItem>
+                                <twig:Sidebar:MenuButton as="a"
                                                          href="{{ path('ticket.index') }}"
                                                          :active="route == 'ticket.index'"
                                                          tooltip="Mes tickets">

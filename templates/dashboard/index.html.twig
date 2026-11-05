@@ -1,0 +1,89 @@
+{% extends 'layout/dashboard.html.twig' %}
+
+{% block title %}Tableau de bord{% endblock %}
+
+{% block page_content %}
+    <div class="mx-auto w-full max-w-5xl px-4 py-10">
+        <h1 class="text-3xl font-bold tracking-tight mb-6">Tableau de bord</h1>
+
+        {# Stats personnelles #}
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div class="rounded-xl border bg-card p-6 shadow-sm">
+                <p class="text-sm text-muted-foreground">Mes tickets</p>
+                <p class="text-3xl font-bold">{{ myTotal }}</p>
+            </div>
+            <div class="rounded-xl border bg-card p-6 shadow-sm">
+                <p class="text-sm text-muted-foreground">En cours</p>
+                <p class="text-3xl font-bold text-yellow-500">{{ myOpen }}</p>
+            </div>
+            <div class="rounded-xl border bg-card p-6 shadow-sm">
+                <p class="text-sm text-muted-foreground">Terminés</p>
+                <p class="text-3xl font-bold text-green-500">{{ myDone }}</p>
+            </div>
+        </div>
+
+        {# Stats globales #}
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div class="rounded-xl border bg-card p-6 shadow-sm">
+                <p class="text-sm text-muted-foreground">Total tickets</p>
+                <p class="text-3xl font-bold">{{ globalTotal }}</p>
+            </div>
+            <div class="rounded-xl border bg-card p-6 shadow-sm">
+                <p class="text-sm text-muted-foreground">Ouverts (global)</p>
+                <p class="text-3xl font-bold text-yellow-500">{{ globalOpen }}</p>
+            </div>
+            <div class="rounded-xl border bg-card p-6 shadow-sm">
+                <p class="text-sm text-muted-foreground">Terminés (global)</p>
+                <p class="text-3xl font-bold text-green-500">{{ globalDone }}</p>
+            </div>
+        </div>
+
+        {# Derniers tickets #}
+        <div class="rounded-xl border bg-card p-6 shadow-sm mb-8">
+            <h2 class="text-lg font-semibold mb-4">Mes derniers tickets</h2>
+            {% if latest is empty %}
+                <p class="text-sm text-muted-foreground">Aucun ticket.</p>
+            {% else %}
+                <ul class="space-y-2">
+                    {% for ticket in latest %}
+                        <li class="flex items-center justify-between text-sm">
+                            <a href="{{ path('ticket.edit', {id: ticket.id}) }}" class="hover:underline">{{ ticket.name }}</a>
+                            {% if ticket.isDone %}
+                                <twig:Badge variant="success">Terminé</twig:Badge>
+                            {% else %}
+                                <twig:Badge variant="warning">En cours</twig:Badge>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+
+        {# Par utilisateur #}
+        {% if byOwner is not empty %}
+            <div class="rounded-xl border bg-card p-6 shadow-sm">
+                <h2 class="text-lg font-semibold mb-4">Tickets par utilisateur</h2>
+                <table class="w-full text-sm">
+                    <thead class="border-b bg-muted/50">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Utilisateur</th>
+                            <th class="px-4 py-2 text-left">Total</th>
+                            <th class="px-4 py-2 text-left">Ouverts</th>
+                            <th class="px-4 py-2 text-left">Terminés</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in byOwner %}
+                            <tr class="border-b last:border-0">
+                                <td class="px-4 py-2">{{ row.owner.email }}</td>
+                                <td class="px-4 py-2">{{ row.total }}</td>
+                                <td class="px-4 py-2">{{ row.open }}</td>
+                                <td class="px-4 py-2">{{ row.done }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
