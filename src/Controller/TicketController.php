@@ -111,4 +111,34 @@ final class TicketController extends AbstractController
 
         return $this->redirectToRoute('ticket.index', $params, Response::HTTP_SEE_OTHER);
     }
+
+    #[Route('/ticket/export', name: 'ticket.export', methods: ['GET'])]
+    public function exportTickets(TicketRepository $ticketRepository, Request $req): Response
+    {
+        $q = $req->query->get('q');
+        $tickets = $ticketRepository->findByOwner($this->getUser(), $q);
+
+        $handle = fopen('php://temp', 'r+');
+        fputcsv($handle, ['ID', 'Nom', 'Statut', 'Commentaire', 'Créé le'], ';', '"', '');
+
+        foreach ($tickets as $ticket) {
+            fputcsv($handle, [
+                $ticket->getId(),
+                $ticket->getName(),
+                $ticket->isDone() ? 'Terminé' : 'En cours',
+                $ticket->getComment(),
+                $ticket->getCreatedAt()?->format('d/m/Y H:i'),
+            ], ';', '"', '');
+        }
+
+        rewind($handle);
+        $csv = "\xEF\xBB\xBF" . stream_get_contents($handle);
+        fclose($handle);
+
+        $response = new Response($csv);
+        $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
+        $response->headers->set('Content-Disposition', 'attachment; filename="tickets.csv"');
+
+        return $response;
+    }
 }
