@@ -59,6 +59,8 @@ final class TicketController extends AbstractController
     #[Route('/ticket/{id}/edit', name: 'ticket.edit', methods: ['GET', 'POST'])]
     public function editTicket(Ticket $ticket, Request $req, EntityManagerInterface $em): Response
     {
+        $this->denyAccessUnlessGranted('TICKET_EDIT', $ticket);
+
         $form = $this->createForm(TicketType::class, $ticket);
         $form->handleRequest($req);
 
@@ -78,9 +80,7 @@ final class TicketController extends AbstractController
     #[Route('/ticket/{id}/delete', name: 'ticket.delete', methods: ['POST'])]
     public function deleteTicket(Ticket $ticket, Request $req, EntityManagerInterface $em): Response
     {
-        if($ticket->getOwner() !== $this->getUser()){
-            throw $this->createAccessDeniedException();
-        }
+        $this->denyAccessUnlessGranted('TICKET_DELETE', $ticket);
 
         if ($this->isCsrfTokenValid('delete' . $ticket->getId(), $req->request->get('_token'))) {
                 $em->remove($ticket);
@@ -94,10 +94,7 @@ final class TicketController extends AbstractController
     #[Route('/ticket/{id}/toggle', name:'ticket.toggle', methods: ['POST'])]
     public function toggleTicket(Ticket $ticket, Request $req, EntityManagerInterface $em):Response
     {
-        // verifier l'owner
-        if($ticket->getOwner() !== $this->getUser()){
-            throw $this->createAccessDeniedException();
-        }
+        $this->denyAccessUnlessGranted('TICKET_TOGGLE', $ticket);
 
         // verifier le CSRF
         if($this->isCsrfTokenValid('toggle' . $ticket->getId(), $req->request->get('_token'))){
