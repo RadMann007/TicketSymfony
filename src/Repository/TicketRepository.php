@@ -32,6 +32,81 @@ class TicketRepository extends ServiceEntityRepository
         return $qb->getQuery()->getResult();
     }
 
+    public function countByOwnerAndStatus(User $owner, ?bool $isDone = null): int
+    {
+        $qb = $this->createQueryBuilder('t')
+            ->select('COUNT(t.id)')
+            ->andWhere('t.owner = :owner')
+            ->setParameter('owner', $owner);
+
+        if ($isDone !== null) {
+            $qb->andWhere('t.isDone = :isDone')
+                ->setParameter('isDone', $isDone);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    public function findLatestByOwner(User $owner, int $limit = 5): array
+    {
+        return $this->createQueryBuilder('t')
+            ->andWhere('t.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->orderBy('t.createdAt', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function countAll(): int
+    {
+        return (int) $this->createQueryBuilder('t')
+            ->select('COUNT(t.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    public function countByStatus(bool $isDone): int
+    {
+        return (int) $this->createQueryBuilder('t')
+            ->select('COUNT(t.id)')
+            ->andWhere('t.isDone = :isDone')
+            ->setParameter('isDone', $isDone)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * @return array<int, array{owner: User, total: int, open: int, done: int}>
+     */
+    public function countByOwner(): array
+    {
+        $rows = $this->createQueryBuilder('t')
+            ->select('u.id AS ownerId, COUNT(t.id) AS total, SUM(CASE WHEN t.isDone = true THEN 1 ELSE 0 END) AS done')
+            ->join('t.owner', 'u')
+            ->groupBy('u.id')
+            ->getQuery()
+            ->getArrayResult();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $owner = $this->getEntityManager()->getRepository(User::class)->find($row['ownerId']);
+            if (!$owner) {
+                continue;
+            }
+            $total = (int) $row['total'];
+            $done = (int) $row['done'];
+            $result[] = [
+                'owner' => $owner,
+                'total' => $total,
+                'done' => $done,
+                'open' => $total - $done,
+            ];
+        }
+
+        return $result;
+    }
+
 //    /**
 //     * @return Ticket[] Returns an array of Ticket objects
 //     */

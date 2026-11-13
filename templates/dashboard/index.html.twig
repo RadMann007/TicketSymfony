@@ -1,0 +1,166 @@
+{% extends 'layout/dashboard.html.twig' %}
+
+{% block title %}Tableau de bord{% endblock %}
+
+{% block page_content %}
+    <div class="mx-auto w-full max-w-6xl px-4 py-8">
+
+        {# ─── En-tête ─── #}
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold tracking-tight">Tableau de bord</h1>
+            <p class="mt-2 text-sm text-muted-foreground">
+                Vue d'ensemble de vos tickets et de l'activité.
+            </p>
+        </div>
+
+        {# ─── Stats personnelles ─── #}
+        <section class="mb-8">
+            <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Mes tickets</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="group rounded-xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-muted-foreground">Total</p>
+                            <p class="mt-1 text-3xl font-bold">{{ myTotal }}</p>
+                        </div>
+                        <div class="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <twig:ux:icon name="lucide:ticket" class="size-5" />
+                        </div>
+                    </div>
+                </div>
+                <div class="group rounded-xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-muted-foreground">En cours</p>
+                            <p class="mt-1 text-3xl font-bold text-amber-500">{{ myOpen }}</p>
+                        </div>
+                        <div class="flex size-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
+                            <twig:ux:icon name="lucide:clock" class="size-5" />
+                        </div>
+                    </div>
+                </div>
+                <div class="group rounded-xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-muted-foreground">Terminés</p>
+                            <p class="mt-1 text-3xl font-bold text-emerald-500">{{ myDone }}</p>
+                        </div>
+                        <div class="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+                            <twig:ux:icon name="lucide:check-circle" class="size-5" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {# ─── Stats globales ─── #}
+        <section class="mb-8">
+            <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Global</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="group rounded-xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-muted-foreground">Total tickets</p>
+                            <p class="mt-1 text-3xl font-bold">{{ globalTotal }}</p>
+                        </div>
+                        <div class="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <twig:ux:icon name="lucide:layers" class="size-5" />
+                        </div>
+                    </div>
+                </div>
+                <div class="group rounded-xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-muted-foreground">Ouverts</p>
+                            <p class="mt-1 text-3xl font-bold text-amber-500">{{ globalOpen }}</p>
+                        </div>
+                        <div class="flex size-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
+                            <twig:ux:icon name="lucide:alert-circle" class="size-5" />
+                        </div>
+                    </div>
+                </div>
+                <div class="group rounded-xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-muted-foreground">Terminés</p>
+                            <p class="mt-1 text-3xl font-bold text-emerald-500">{{ globalDone }}</p>
+                        </div>
+                        <div class="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+                            <twig:ux:icon name="lucide:check" class="size-5" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {# ─── Derniers tickets ─── #}
+        <section class="mb-8">
+            <div class="rounded-xl border bg-card shadow-sm overflow-hidden">
+                <div class="flex items-center justify-between px-6 py-4 border-b">
+                    <h2 class="text-base font-semibold">Mes derniers tickets</h2>
+                    <twig:Button as="a" href="{{ path('ticket.index') }}" variant="ghost" size="sm">
+                        Voir tout
+                    </twig:Button>
+                </div>
+                {% if latest is empty %}
+                    <div class="px-6 py-10 text-center text-sm text-muted-foreground">
+                        <twig:ux:icon name="lucide:inbox" class="size-10 mx-auto mb-2 opacity-40" />
+                        Aucun ticket pour le moment.
+                    </div>
+                {% else %}
+                    <div class="divide-y">
+                        {% for ticket in latest %}
+                            <a href="{{ path('ticket.edit', {id: ticket.id}) }}"
+                               class="flex items-center justify-between px-6 py-3 hover:bg-muted/50 transition-colors">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-medium truncate">{{ ticket.name }}</p>
+                                    <p class="text-xs text-muted-foreground">{{ ticket.createdAt|date('d/m/Y à H:i') }}</p>
+                                </div>
+                                {% if ticket.isDone %}
+                                    <twig:Badge variant="success">Terminé</twig:Badge>
+                                {% else %}
+                                    <twig:Badge variant="warning">En cours</twig:Badge>
+                                {% endif %}
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+
+        {# ─── Par utilisateur ─── #}
+        {% if byOwner is not empty %}
+            <section>
+                <div class="rounded-xl border bg-card shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b">
+                        <h2 class="text-base font-semibold">Tickets par utilisateur</h2>
+                    </div>
+                    <twig:Table>
+                        <twig:Table:Header>
+                            <twig:Table:Row>
+                                <twig:Table:Head>Utilisateur</twig:Table:Head>
+                                <twig:Table:Head class="w-24 text-center">Total</twig:Table:Head>
+                                <twig:Table:Head class="w-24 text-center">Ouverts</twig:Table:Head>
+                                <twig:Table:Head class="w-24 text-center">Terminés</twig:Table:Head>
+                            </twig:Table:Row>
+                        </twig:Table:Header>
+                        <twig:Table:Body>
+                            {% for row in byOwner %}
+                                <twig:Table:Row>
+                                    <twig:Table:Cell class="font-medium">{{ row.owner.email }}</twig:Table:Cell>
+                                    <twig:Table:Cell class="text-center">{{ row.total }}</twig:Table:Cell>
+                                    <twig:Table:Cell class="text-center">
+                                        <twig:Badge variant="warning">{{ row.open }}</twig:Badge>
+                                    </twig:Table:Cell>
+                                    <twig:Table:Cell class="text-center">
+                                        <twig:Badge variant="success">{{ row.done }}</twig:Badge>
+                                    </twig:Table:Cell>
+                                </twig:Table:Row>
+                            {% endfor %}
+                        </twig:Table:Body>
+                    </twig:Table>
+                </div>
+            </section>
+        {% endif %}
+    </div>
+{% endblock %}

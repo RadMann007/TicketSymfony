@@ -59,6 +59,8 @@ final class TicketController extends AbstractController
     #[Route('/ticket/{id}/edit', name: 'ticket.edit', methods: ['GET', 'POST'])]
     public function editTicket(Ticket $ticket, Request $req, EntityManagerInterface $em): Response
     {
+        $this->denyAccessUnlessGranted('TICKET_EDIT', $ticket);
+
         $form = $this->createForm(TicketType::class, $ticket);
         $form->handleRequest($req);
 
@@ -78,9 +80,7 @@ final class TicketController extends AbstractController
     #[Route('/ticket/{id}/delete', name: 'ticket.delete', methods: ['POST'])]
     public function deleteTicket(Ticket $ticket, Request $req, EntityManagerInterface $em): Response
     {
-        if($ticket->getOwner() !== $this->getUser()){
-            throw $this->createAccessDeniedException();
-        }
+        $this->denyAccessUnlessGranted('TICKET_DELETE', $ticket);
 
         if ($this->isCsrfTokenValid('delete' . $ticket->getId(), $req->request->get('_token'))) {
                 $em->remove($ticket);
@@ -94,10 +94,7 @@ final class TicketController extends AbstractController
     #[Route('/ticket/{id}/toggle', name:'ticket.toggle', methods: ['POST'])]
     public function toggleTicket(Ticket $ticket, Request $req, EntityManagerInterface $em):Response
     {
-        // verifier l'owner
-        if($ticket->getOwner() !== $this->getUser()){
-            throw $this->createAccessDeniedException();
-        }
+        $this->denyAccessUnlessGranted('TICKET_TOGGLE', $ticket);
 
         // verifier le CSRF
         if($this->isCsrfTokenValid('toggle' . $ticket->getId(), $req->request->get('_token'))){
@@ -110,5 +107,35 @@ final class TicketController extends AbstractController
         $params = $q ? ['q' => $q ] : [];
 
         return $this->redirectToRoute('ticket.index', $params, Response::HTTP_SEE_OTHER);
+    }
+
+    #[Route('/ticket/export', name: 'ticket.export', methods: ['GET'])]
+    public function exportTickets(TicketRepository $ticketRepository, Request $req): Response
+    {
+        $q = $req->query->get('q');
+        $tickets = $ticketRepository->findByOwner($this->getUser(), $q);
+
+        $handle = fopen('php://temp', 'r+');
+        fputcsv($handle, ['ID', 'Nom', 'Statut', 'Commentaire', 'Créé le'], ';', '"', '');
+
+        foreach ($tickets as $ticket) {
+            fputcsv($handle, [
+                $ticket->getId(),
+                $ticket->getName(),
+                $ticket->isDone() ? 'Terminé' : 'En cours',
+                $ticket->getComment(),
+                $ticket->getCreatedAt()?->format('d/m/Y H:i'),
+            ], ';', '"', '');
+        }
+
+        rewind($handle);
+        $csv = "\xEF\xBB\xBF" . stream_get_contents($handle);
+        fclose($handle);
+
+        $response = new Response($csv);
+        $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
+        $response->headers->set('Content-Disposition', 'attachment; filename="tickets.csv"');
+
+        return $response;
     }
 }

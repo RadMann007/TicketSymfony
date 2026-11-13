@@ -31,6 +31,10 @@
                 <twig:ux:icon name="lucide:plus" class="mr-2 size-4" />
                 Créer un ticket
             </twig:Button>
+            <twig:Button as="a" href="{{ path('ticket.export', {q: q}) }}" variant="outline">
+                <twig:ux:icon name="lucide:download" class="mr-2 size-4" />
+                Exporter CSV
+            </twig:Button>
         </div>
 
         {# Recherche #}
@@ -218,7 +222,7 @@
             </twig:Table>
         </div>
 
-        {# Pagination (shadcn) #}
+        {# Pagination (shadcn)  #}
         {% if pagination.paginationData.pageCount > 1 %}
             <div class="mt-6 flex justify-center">
                 <twig:Pagination>

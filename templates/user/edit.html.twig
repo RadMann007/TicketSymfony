@@ -1,0 +1,49 @@
+{% extends 'layout/dashboard.html.twig' %}
+
+{% block title %}Modifier les rôles{% endblock %}
+
+{% block page_content %}
+    <div class="mx-auto max-w-md px-4 py-10">
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold tracking-tight">Rôles de {{ user.email }}</h1>
+            <p class="mt-2 text-sm text-muted-foreground">
+                Sélectionnez les rôles à attribuer à cet utilisateur.
+            </p>
+        </div>
+
+        <div class="rounded-xl border bg-card p-6 shadow-sm">
+            {{ form_start(form) }}
+
+                <div class="mb-6 space-y-3">
+                    {% for child in form.roles %}
+                        <twig:Field:Group>
+                            <twig:Field orientation="horizontal">
+                                <twig:Checkbox
+                                    id="{{ child.vars.id }}"
+                                    name="{{ child.vars.full_name }}"
+                                    value="{{ child.vars.value }}"
+                                    :checked="child.vars.checked"
+                                />
+                                <twig:Field:Label for="{{ child.vars.id }}">
+                                    {{ child.vars.label }}
+                                </twig:Field:Label>
+                            </twig:Field>
+                        </twig:Field:Group>
+                    {% endfor %}
+                    {{ form_errors(form.roles) }}
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <twig:Button type="submit" variant="default">
+                        Enregistrer
+                    </twig:Button>
+                    <twig:Button as="a" href="{{ path('admin.user.index') }}" variant="outline">
+                        Annuler
+                    </twig:Button>
+                </div>
+
+                {{ form_widget(form._token) }}
+            {{ form_end(form, {render_rest: false}) }}
+        </div>
+    </div>
+{% endblock %}
