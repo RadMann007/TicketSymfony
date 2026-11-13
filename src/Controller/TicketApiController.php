@@ -13,6 +13,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 final class TicketApiController extends AbstractController
 {
@@ -28,7 +29,7 @@ final class TicketApiController extends AbstractController
     #[Route('/api/tickets/{id}', name: 'detailTicketApi', methods: ['GET'])]
     public function getDetailTicket(Ticket $ticket, SerializerInterface $serializer, TicketRepository $rep): JsonResponse
     {
-        $jsonTicket = $serializer->serialize($ticket, 'json');
+        $jsonTicket = $serializer->serialize($ticket, 'json', ['groups' => 'getTickets']);
         return new JsonResponse($jsonTicket, Response::HTTP_OK, ['accept' => 'json'], true);
     }
 
@@ -42,9 +43,15 @@ final class TicketApiController extends AbstractController
     }
 
     #[Route('/api/tickets', name: 'createTicketApi', methods: ['POST'])]
-    public function createTicketApi(Request $req, SerializerInterface $serializer, EntityManagerInterface $em, UrlGeneratorInterface $urlGenerator): JsonResponse
+    public function createTicketApi(Request $req, SerializerInterface $serializer, EntityManagerInterface $em, UrlGeneratorInterface $urlGenerator, ValidatorInterface $validator): JsonResponse
     {
         $ticket = $serializer->deserialize($req->getContent(), Ticket::class, 'json');
+
+        $err = $validator->validate($ticket);
+        if($err->count() > 0) {
+            return new JsonResponse($serializer->serialize($err, 'json'), JsonResponse::HTTP_BAD_REQUEST,[], true);
+        }
+
         $em->persist($ticket);
         $em->flush()();
 

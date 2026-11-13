@@ -6,6 +6,7 @@ use App\Repository\TicketRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: TicketRepository::class)]
 class Ticket
@@ -14,6 +15,8 @@ class Ticket
     #[ORM\GeneratedValue]
     #[ORM\Column]
     #[Groups(["getTickets"])]
+    #[Assert\NotBlank(message:'Le titre est obligatoire')]
+    #[Assert\Length(min:1, max: 255, minMessage: "Le titre doit au moins {{limit}} caracteres", maxMessage: "Le titre doit au max {{limit}} caracteres")]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
@@ -33,7 +36,6 @@ class Ticket
 
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
-    #[Groups(["getTickets"])]
     private ?User $owner = null;
 
     public function getId(): ?int
