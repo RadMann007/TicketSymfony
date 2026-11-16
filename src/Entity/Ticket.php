@@ -15,12 +15,12 @@ class Ticket
     #[ORM\GeneratedValue]
     #[ORM\Column]
     #[Groups(["getTickets"])]
-    #[Assert\NotBlank(message:'Le titre est obligatoire')]
-    #[Assert\Length(min:1, max: 255, minMessage: "Le titre doit au moins {{limit}} caracteres", maxMessage: "Le titre doit au max {{limit}} caracteres")]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
     #[Groups(["getTickets"])]
+    #[Assert\NotBlank(message:'Le titre est obligatoire')]
+    #[Assert\Length(min:1, max: 255, minMessage: "Le titre doit au moins {{limit}} caracteres", maxMessage: "Le titre doit au max {{limit}} caracteres")]
     private ?string $name = null;
 
     #[ORM\Column]

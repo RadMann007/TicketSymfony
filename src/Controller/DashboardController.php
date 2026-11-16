@@ -18,6 +18,9 @@ final class DashboardController extends AbstractController
     {
         $user = $this->getUser();
 
+        $byOwner = $ticketRepository->countByOwner();
+        usort($byOwner, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
+
         return $this->render('dashboard/index.html.twig', [
             'myTotal' => $ticketRepository->countByOwnerAndStatus($user),
             'myOpen' => $ticketRepository->countByOwnerAndStatus($user, false),
@@ -26,7 +29,7 @@ final class DashboardController extends AbstractController
             'globalTotal' => $ticketRepository->countAll(),
             'globalOpen' => $ticketRepository->countByStatus(false),
             'globalDone' => $ticketRepository->countByStatus(true),
-            'byOwner' => $ticketRepository->countByOwner(),
+            'byOwner' => $byOwner,
         ]);
     }
 }
