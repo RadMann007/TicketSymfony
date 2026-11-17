@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\Ticket;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -23,13 +24,33 @@ class TicketRepository extends ServiceEntityRepository
         ->andWhere('t.owner = :owner')
         ->setParameter('owner', $owner)
         ->orderBy('t.id', 'ASC');
-        
-        if($q !== null && trim($q) !== ''){
-            $qb->andWhere('t.name LIKE :q OR t.comment LIKE :q')
-            ->setParameter('q', '%' .$q . '%');
-        }
+
+        $this->applySearch($qb, $q);
 
         return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Tickets owned by or assigned to the given user.
+     */
+    public function findVisibleTo(User $user, ?string $q = null): array
+    {
+        $qb = $this->createQueryBuilder('t')
+            ->andWhere('(t.owner = :user OR t.assignedTo = :user)')
+            ->setParameter('user', $user)
+            ->orderBy('t.id', 'ASC');
+
+        $this->applySearch($qb, $q);
+
+        return $qb->getQuery()->getResult();
+    }
+
+    private function applySearch(QueryBuilder $qb, ?string $q): void
+    {
+        if ($q !== null && trim($q) !== '') {
+            $qb->andWhere('(t.name LIKE :q OR t.comment LIKE :q)')
+                ->setParameter('q', '%' . $q . '%');
+        }
     }
 
     public function countByOwnerAndStatus(User $owner, ?bool $isDone = null): int
@@ -56,6 +77,32 @@ class TicketRepository extends ServiceEntityRepository
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
+    }
+
+    public function findLatestForUser(User $user, int $limit = 5): array
+    {
+        return $this->createQueryBuilder('t')
+            ->andWhere('(t.owner = :user OR t.assignedTo = :user)')
+            ->setParameter('user', $user)
+            ->orderBy('t.createdAt', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function countAssignedTo(User $user, ?bool $isDone = null): int
+    {
+        $qb = $this->createQueryBuilder('t')
+            ->select('COUNT(t.id)')
+            ->andWhere('t.assignedTo = :user')
+            ->setParameter('user', $user);
+
+        if ($isDone !== null) {
+            $qb->andWhere('t.isDone = :isDone')
+                ->setParameter('isDone', $isDone);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
     public function countAll(): int

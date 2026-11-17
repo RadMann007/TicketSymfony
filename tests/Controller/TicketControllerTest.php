@@ -2,6 +2,7 @@
 
 namespace App\Tests\Controller;
 
+use App\Entity\Comment;
 use App\Entity\Ticket;
 use App\Entity\User;
 use App\Repository\TicketRepository;
@@ -26,10 +27,11 @@ final class TicketControllerTest extends WebTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
-    private function createUser(string $email = 'user@test.com', string $password = 'password'): User
+    private function createUser(string $email = 'user@test.com', string $password = 'password', array $roles = []): User
     {
         $user = new User();
         $user->setEmail($email);
+        $user->setRoles($roles);
         $user->setPassword($this->passwordHasher->hashPassword($user, $password));
 
         $this->entityManager->persist($user);
@@ -161,7 +163,7 @@ final class TicketControllerTest extends WebTestCase
 
         $this->client->submit($form);
 
-        self::assertResponseRedirects('/');
+        self::assertResponseRedirects('/ticket/' . $ticket->getId() . '/edit');
 
         $ticketRepository = static::getContainer()->get(TicketRepository::class);
         $updatedTicket = $ticketRepository->find($ticket->getId());
@@ -273,5 +275,150 @@ final class TicketControllerTest extends WebTestCase
         ]);
 
         self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testAdminCanAssignTicket(): void
+    {
+        $admin = $this->createUser('admin@test.com', 'password', ['ROLE_ADMIN']);
+        $owner = $this->createUser('owner@test.com');
+        $assignee = $this->createUser('assignee@test.com');
+        $assigneeId = $assignee->getId();
+        $ticket = $this->createTicket($owner, 'Ticket à assigner');
+
+        $this->client->loginUser($admin);
+
+        $crawler = $this->client->request('GET', '/ticket/' . $ticket->getId() . '/edit');
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('select[name="ticket[assignedTo]"]'));
+
+        $form = $crawler->selectButton('Enregistrer les modifications')->form();
+        $form['ticket[assignedTo]']->select((string) $assigneeId);
+        $this->client->submit($form);
+
+        self::assertResponseRedirects('/ticket/' . $ticket->getId() . '/edit');
+
+        $this->entityManager->clear();
+        $updated = $this->entityManager->getRepository(Ticket::class)->find($ticket->getId());
+        self::assertNotNull($updated->getAssignedTo());
+        self::assertSame($assigneeId, $updated->getAssignedTo()->getId());
+    }
+
+    public function testOwnerDoesNotSeeAssignmentField(): void
+    {
+        $owner = $this->createUser('owner@test.com');
+        $ticket = $this->createTicket($owner, 'Ticket non assignable');
+
+        $this->client->loginUser($owner);
+
+        $crawler = $this->client->request('GET', '/ticket/' . $ticket->getId() . '/edit');
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(0, $crawler->filter('select[name="ticket[assignedTo]"]'));
+    }
+
+    public function testAssigneeSeesTicketAndCanToggleIt(): void
+    {
+        $owner = $this->createUser('owner@test.com');
+        $assignee = $this->createUser('assignee@test.com');
+        $ticket = $this->createTicket($owner, 'Ticket assigné', null, false);
+        $ticket->setAssignedTo($assignee);
+        $this->entityManager->flush();
+
+        $this->client->loginUser($assignee);
+
+        $crawler = $this->client->request('GET', '/');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Ticket assigné');
+
+        $token = $crawler->filter('form[action*="/ticket/' . $ticket->getId() . '/toggle"] input[name="_token"]')->attr('value');
+
+        $this->client->request('POST', '/ticket/' . $ticket->getId() . '/toggle', [
+            '_token' => $token,
+        ]);
+
+        self::assertResponseRedirects('/');
+
+        $this->entityManager->clear();
+        $updated = $this->entityManager->getRepository(Ticket::class)->find($ticket->getId());
+        self::assertTrue($updated->isDone());
+    }
+
+    public function testAssigneeCannotDeleteTicket(): void
+    {
+        $owner = $this->createUser('owner@test.com');
+        $assignee = $this->createUser('assignee@test.com');
+        $ticket = $this->createTicket($owner, 'Ticket assigné');
+        $ticket->setAssignedTo($assignee);
+        $this->entityManager->flush();
+
+        $this->client->loginUser($assignee);
+
+        $this->client->request('POST', '/ticket/' . $ticket->getId() . '/delete', [
+            '_token' => 'dummy',
+        ]);
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testOwnerCanAddComment(): void
+    {
+        $owner = $this->createUser();
+        $ticket = $this->createTicket($owner, 'Ticket commenté');
+
+        $this->client->loginUser($owner);
+
+        $crawler = $this->client->request('GET', '/ticket/' . $ticket->getId() . '/edit');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Aucun commentaire pour le moment.');
+
+        $form = $crawler->selectButton('Publier')->form();
+        $form['comment[content]'] = 'Un premier commentaire.';
+        $this->client->submit($form);
+
+        self::assertResponseRedirects('/ticket/' . $ticket->getId() . '/edit');
+
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('body', 'Un premier commentaire.');
+        self::assertSelectorTextContains('body', 'Commentaire ajouté.');
+    }
+
+    public function testNonOwnerCannotAddComment(): void
+    {
+        $owner = $this->createUser('owner@test.com');
+        $other = $this->createUser('other@test.com');
+        $ticket = $this->createTicket($owner, 'Ticket privé');
+
+        $this->client->loginUser($other);
+
+        $this->client->request('POST', '/ticket/' . $ticket->getId() . '/comment', [
+            'comment' => ['content' => 'Je ne devrais pas pouvoir.'],
+        ]);
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testEmptyCommentIsRejected(): void
+    {
+        $owner = $this->createUser();
+        $ticket = $this->createTicket($owner, 'Ticket sans commentaire');
+
+        $this->client->loginUser($owner);
+
+        $crawler = $this->client->request('GET', '/ticket/' . $ticket->getId() . '/edit');
+        $token = $crawler->filter('form[name="comment"] input[name="comment[_token]"]')->attr('value');
+
+        $this->client->request('POST', '/ticket/' . $ticket->getId() . '/comment', [
+            'comment' => [
+                'content' => '',
+                '_token' => $token,
+            ],
+        ]);
+
+        self::assertResponseRedirects('/ticket/' . $ticket->getId() . '/edit');
+
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('body', 'Le commentaire ne peut pas être vide.');
+
+        self::assertSame(0, $this->entityManager->getRepository(Comment::class)->count([]));
     }
 }

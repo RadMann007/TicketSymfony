@@ -2,6 +2,7 @@
 
 namespace App\DataFixtures;
 
+use App\Entity\Comment;
 use App\Entity\Ticket;
 use App\Entity\User;
 use DateTimeImmutable;
@@ -129,6 +130,7 @@ final class AppFixtures extends Fixture
         shuffle($titles);
 
         $total = count($titles);
+        $tickets = [];
 
         for ($i = 0; $i < $total; ++$i) {
             $ticket = new Ticket();
@@ -145,9 +147,59 @@ final class AppFixtures extends Fixture
                     ->setTime(mt_rand(8, 18), mt_rand(0, 59))
             );
 
-            $ticket->setOwner($i < 5 ? $users[$i % count($users)] : $users[array_rand($users)]);
+            $owner = $i < 5 ? $users[$i % count($users)] : $users[array_rand($users)];
+            $ticket->setOwner($owner);
+
+            // Environ deux tickets sur trois sont assignés à quelqu'un d'autre que le propriétaire.
+            if (mt_rand(1, 100) <= 66) {
+                $candidates = array_values(array_filter($users, static fn ($user) => $user !== $owner));
+                $ticket->setAssignedTo($candidates[array_rand($candidates)]);
+            }
 
             $manager->persist($ticket);
+            $tickets[] = $ticket;
+        }
+
+        $this->loadComments($manager, $users, $tickets);
+    }
+
+    /**
+     * @param list<User>   $users
+     * @param list<Ticket> $tickets
+     */
+    private function loadComments(ObjectManager $manager, array $users, array $tickets): void
+    {
+        $messages = [
+            "Je regarde ça aujourd'hui.",
+            'Le problème est reproduit en local.',
+            'Peut-on prioriser ce ticket ?',
+            "C'est corrigé, en attente de validation.",
+            'Vérifié en préproduction, tout est bon.',
+            'Il manque encore les tests.',
+            'Merci pour le retour.',
+            'Je prends le ticket en charge.',
+        ];
+
+        $now = new DateTimeImmutable();
+
+        foreach ($tickets as $ticket) {
+            if (mt_rand(1, 100) > 60) {
+                continue;
+            }
+
+            $count = mt_rand(1, 3);
+
+            for ($i = 0; $i < $count; ++$i) {
+                $comment = new Comment();
+                $comment->setTicket($ticket);
+                $comment->setAuthor($users[array_rand($users)]);
+                $comment->setContent($messages[array_rand($messages)]);
+
+                $createdAt = $ticket->getCreatedAt()->modify(sprintf('+%d hours', mt_rand(1, 72)));
+                $comment->setCreatedAt($createdAt > $now ? $now : $createdAt);
+
+                $manager->persist($comment);
+            }
         }
     }
 }

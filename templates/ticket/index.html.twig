@@ -69,7 +69,8 @@
                         <twig:Table:Head>Nom</twig:Table:Head>
                         <twig:Table:Head class="w-32">Statut</twig:Table:Head>
                         <twig:Table:Head class="w-32">Commentaire</twig:Table:Head>
-                        <twig:Table:Head class="w-32">Utilisateur</twig:Table:Head>
+                        <twig:Table:Head class="w-32">Propriétaire</twig:Table:Head>
+                        <twig:Table:Head class="w-40">Assigné à</twig:Table:Head>
                         <twig:Table:Head class="w-48">Créé le</twig:Table:Head>
                         <twig:Table:Head class="w-24 text-right">Actions</twig:Table:Head>
                     </twig:Table:Row>
@@ -87,7 +88,7 @@
 
                             {# ⬇️ CELLULE STATUT — maintenant cliquable ⬇️ #}
                             <twig:Table:Cell>
-                                {% if ticket.owner == app.user %}
+                                {% if is_granted('TICKET_TOGGLE', ticket) %}
                                     <form method="post"
                                           action="{{ path('ticket.toggle', {id: ticket.id}) }}"
                                           class="inline">
@@ -122,18 +123,43 @@
                                 {{ ticket.owner.email }}
                             </twig:Table:Cell>
                             <twig:Table:Cell class="text-sm text-muted-foreground">
+                                {% if ticket.assignedTo %}
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                                            {{ ticket.assignedTo.email|slice(0, 1)|upper }}
+                                        </span>
+                                        <span class="truncate">{{ ticket.assignedTo.email }}</span>
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted-foreground/60">Non assigné</span>
+                                {% endif %}
+                            </twig:Table:Cell>
+                            <twig:Table:Cell class="text-sm text-muted-foreground">
                                 {{ ticket.createdAt|date('d/m/Y à H:i') }}
                             </twig:Table:Cell>
                             <twig:Table:Cell>
                                 <div class="flex items-center justify-end gap-1">
 
-                                    {% if ticket.owner == app.user %}
+                                    {% if is_granted('TICKET_EDIT', ticket) %}
 
                                         {# Éditer #}
                                         <twig:Button as="a" href="{{ path('ticket.edit', {id: ticket.id}) }}"
                                                      variant="ghost" size="icon" title="Modifier">
                                             <twig:ux:icon name="lucide:pencil" class="size-4" />
                                         </twig:Button>
+
+                                    {% else %}
+
+                                        <span title="Vous n'avez pas les droits pour modifier ce ticket">
+                                            <twig:Button variant="ghost" size="icon" disabled
+                                                         class="cursor-not-allowed opacity-40">
+                                                <twig:ux:icon name="lucide:pencil" class="size-4" />
+                                            </twig:Button>
+                                        </span>
+
+                                    {% endif %}
+
+                                    {% if is_granted('TICKET_DELETE', ticket) %}
 
                                         {# Supprimer #}
                                         <twig:AlertDialog id="delete-dialog-{{ ticket.id }}">
@@ -174,14 +200,7 @@
 
                                     {% else %}
 
-                                        {# Boutons grisés — non owner #}
-                                        <span title="Vous n'êtes pas le propriétaire de ce ticket">
-                                            <twig:Button variant="ghost" size="icon" disabled
-                                                         class="cursor-not-allowed opacity-40">
-                                                <twig:ux:icon name="lucide:pencil" class="size-4" />
-                                            </twig:Button>
-                                        </span>
-                                        <span title="Vous n'êtes pas le propriétaire de ce ticket">
+                                        <span title="Seul le propriétaire ou un administrateur peut supprimer ce ticket">
                                             <twig:Button variant="ghost" size="icon" disabled
                                                          class="cursor-not-allowed opacity-40">
                                                 <twig:ux:icon name="lucide:trash-2" class="size-4" />
@@ -195,7 +214,7 @@
                         </twig:Table:Row>
                     {% else %}
                         <twig:Table:Row>
-                            <twig:Table:Cell colspan="7" class="py-12 text-center">
+                            <twig:Table:Cell colspan="8" class="py-12 text-center">
                                 <div class="flex flex-col items-center gap-3">
                                     {% if q %}
                                         <twig:ux:icon name="lucide:search-x" class="size-12 text-muted-foreground/50" />

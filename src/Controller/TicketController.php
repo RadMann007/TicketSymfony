@@ -2,7 +2,10 @@
 
 namespace App\Controller;
 
+use App\Entity\Comment;
 use App\Entity\Ticket;
+use App\Entity\User;
+use App\Form\CommentType;
 use App\Form\TicketType;
 use App\Repository\TicketRepository;
 use DateTimeImmutable;
@@ -21,7 +24,7 @@ final class TicketController extends AbstractController
         $q = $req->query->get('q');
 
         $pagination = $paginator->paginate(
-            $ticketRepository->findByOwner($this->getUser(), $q),
+            $ticketRepository->findVisibleTo($this->getUser(), $q),
             $req->query->getInt('page', 1),
             10
         );
@@ -40,7 +43,9 @@ final class TicketController extends AbstractController
         $ticket->setIsDone(false);
         $ticket->setOwner($this->getUser());
 
-        $form = $this->createForm(TicketType::class, $ticket);
+        $form = $this->createForm(TicketType::class, $ticket, [
+            'allow_assignment' => $this->isGranted('ROLE_ADMIN'),
+        ]);
         $form->handleRequest($req);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -61,20 +66,57 @@ final class TicketController extends AbstractController
     {
         $this->denyAccessUnlessGranted('TICKET_EDIT', $ticket);
 
-        $form = $this->createForm(TicketType::class, $ticket);
+        $form = $this->createForm(TicketType::class, $ticket, [
+            'allow_assignment' => $this->isGranted('TICKET_ASSIGN', $ticket),
+        ]);
         $form->handleRequest($req);
 
         if ($form->isSubmitted() && $form->isValid()) {
             $em->flush();
             $this->addFlash('success', 'Le ticket a bien été modifié !');
 
-            return $this->redirectToRoute('ticket.index', [], Response::HTTP_SEE_OTHER);
+            return $this->redirectToRoute('ticket.edit', ['id' => $ticket->getId()], Response::HTTP_SEE_OTHER);
         }
+
+        $commentForm = $this->createForm(CommentType::class, new Comment(), [
+            'action' => $this->generateUrl('ticket.comment', ['id' => $ticket->getId()]),
+        ]);
 
         return $this->render('ticket/edit.html.twig', [
             'ticket' => $ticket,
             'form' => $form,
+            'commentForm' => $commentForm,
         ]);
+    }
+
+    #[Route('/ticket/{id}/comment', name: 'ticket.comment', methods: ['POST'])]
+    public function addComment(Ticket $ticket, Request $req, EntityManagerInterface $em): Response
+    {
+        $this->denyAccessUnlessGranted('TICKET_VIEW', $ticket);
+
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $comment = new Comment();
+        $comment->setTicket($ticket);
+        $comment->setAuthor($user);
+
+        $form = $this->createForm(CommentType::class, $comment, [
+            'action' => $this->generateUrl('ticket.comment', ['id' => $ticket->getId()]),
+        ]);
+        $form->handleRequest($req);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $em->persist($comment);
+            $em->flush();
+            $this->addFlash('success', 'Commentaire ajouté.');
+        } else {
+            $this->addFlash('error', 'Le commentaire ne peut pas être vide.');
+        }
+
+        return $this->redirectToRoute('ticket.edit', ['id' => $ticket->getId()], Response::HTTP_SEE_OTHER);
     }
 
     #[Route('/ticket/{id}/delete', name: 'ticket.delete', methods: ['POST'])]
@@ -113,7 +155,7 @@ final class TicketController extends AbstractController
     public function exportTickets(TicketRepository $ticketRepository, Request $req): Response
     {
         $q = $req->query->get('q');
-        $tickets = $ticketRepository->findByOwner($this->getUser(), $q);
+        $tickets = $ticketRepository->findVisibleTo($this->getUser(), $q);
 
         $handle = fopen('php://temp', 'r+');
         fputcsv($handle, ['ID', 'Nom', 'Statut', 'Commentaire', 'Créé le'], ';', '"', '');
