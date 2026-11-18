@@ -1,0 +1,63 @@
+{% extends 'layout/dashboard.html.twig' %}
+
+{% block title %}Modifier les rôles{% endblock %}
+
+{% block page_content %}
+    <div class="mx-auto max-w-md px-4 py-10">
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold tracking-tight">Rôles de {{ user.email }}</h1>
+            <p class="mt-2 text-sm text-muted-foreground">
+                Cochez « Administrateur » pour donner les droits d'administration.
+                Le rôle utilisateur est attribué automatiquement à tous les comptes.
+            </p>
+        </div>
+
+        {% for type, messages in app.flashes(['success', 'error']) %}
+            {% for message in messages %}
+                <div class="mb-6 flex items-start gap-3 rounded-lg border p-4 text-sm
+                            {{ type == 'error'
+                                ? 'border-red-200 bg-red-50 text-red-800'
+                                : 'border-green-200 bg-green-50 text-green-800' }}">
+                    <span class="text-lg leading-none">{{ type == 'error' ? '⚠️' : '✅' }}</span>
+                    <span>{{ message }}</span>
+                </div>
+            {% endfor %}
+        {% endfor %}
+
+        <div class="rounded-xl border bg-card p-6 shadow-sm">
+            {{ form_start(form) }}
+
+                <div class="mb-6 space-y-3">
+                    {% for child in form.roles %}
+                        <twig:Field:Group>
+                            <twig:Field orientation="horizontal">
+                                <twig:Checkbox
+                                    id="{{ child.vars.id }}"
+                                    name="{{ child.vars.full_name }}"
+                                    value="{{ child.vars.value }}"
+                                    :checked="child.vars.checked"
+                                />
+                                <twig:Field:Label for="{{ child.vars.id }}">
+                                    {{ child.vars.label }}
+                                </twig:Field:Label>
+                            </twig:Field>
+                        </twig:Field:Group>
+                    {% endfor %}
+                    {{ form_errors(form.roles) }}
+                    {{ form_help(form.roles) }}
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <twig:Button type="submit" variant="default">
+                        Enregistrer
+                    </twig:Button>
+                    <twig:Button as="a" href="{{ path('admin.user.index') }}" variant="outline">
+                        Annuler
+                    </twig:Button>
+                </div>
+
+                {{ form_widget(form._token) }}
+            {{ form_end(form, {render_rest: false}) }}
+        </div>
+    </div>
+{% endblock %}

@@ -2,7 +2,11 @@
 
 namespace App\Controller;
 
+use App\Entity\Comment;
 use App\Entity\Ticket;
+use App\Entity\User;
+use App\Enum\TicketPriority;
+use App\Form\CommentType;
 use App\Form\TicketType;
 use App\Repository\TicketRepository;
 use DateTimeImmutable;
@@ -18,17 +22,32 @@ final class TicketController extends AbstractController
     #[Route('/', name: 'ticket.index', methods: ['GET'])]
     public function index(TicketRepository $ticketRepository, Request $req, PaginatorInterface $paginator): Response
     {
-        $q = $req->query->get('q');
+        $filters = $this->readFilters($req);
 
         $pagination = $paginator->paginate(
-            $ticketRepository->findByOwner($this->getUser(), $q),
+            $ticketRepository->findVisibleTo(
+                $this->getUser(),
+                $filters['q'],
+                $filters['priority'],
+                $filters['overdue'],
+                $filters['sort'],
+            ),
             $req->query->getInt('page', 1),
             10
         );
 
         return $this->render('ticket/index.html.twig', [
             'pagination' => $pagination,
-            'q' => $q,
+            'q' => $filters['q'],
+            'priority' => $filters['priority'],
+            'overdue' => $filters['overdue'],
+            'sort' => $filters['sort'],
+            'sortOptions' => [
+                TicketRepository::SORT_RECENT => 'Plus récents',
+                TicketRepository::SORT_OLDEST => 'Plus anciens',
+                TicketRepository::SORT_PRIORITY => 'Priorité',
+                TicketRepository::SORT_DUE => 'Échéance',
+            ],
         ]);
     }
 
@@ -40,7 +59,9 @@ final class TicketController extends AbstractController
         $ticket->setIsDone(false);
         $ticket->setOwner($this->getUser());
 
-        $form = $this->createForm(TicketType::class, $ticket);
+        $form = $this->createForm(TicketType::class, $ticket, [
+            'allow_assignment' => $this->isGranted('ROLE_ADMIN'),
+        ]);
         $form->handleRequest($req);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -59,28 +80,65 @@ final class TicketController extends AbstractController
     #[Route('/ticket/{id}/edit', name: 'ticket.edit', methods: ['GET', 'POST'])]
     public function editTicket(Ticket $ticket, Request $req, EntityManagerInterface $em): Response
     {
-        $form = $this->createForm(TicketType::class, $ticket);
+        $this->denyAccessUnlessGranted('TICKET_EDIT', $ticket);
+
+        $form = $this->createForm(TicketType::class, $ticket, [
+            'allow_assignment' => $this->isGranted('TICKET_ASSIGN', $ticket),
+        ]);
         $form->handleRequest($req);
 
         if ($form->isSubmitted() && $form->isValid()) {
             $em->flush();
             $this->addFlash('success', 'Le ticket a bien été modifié !');
 
-            return $this->redirectToRoute('ticket.index', [], Response::HTTP_SEE_OTHER);
+            return $this->redirectToRoute('ticket.edit', ['id' => $ticket->getId()], Response::HTTP_SEE_OTHER);
         }
+
+        $commentForm = $this->createForm(CommentType::class, new Comment(), [
+            'action' => $this->generateUrl('ticket.comment', ['id' => $ticket->getId()]),
+        ]);
 
         return $this->render('ticket/edit.html.twig', [
             'ticket' => $ticket,
             'form' => $form,
+            'commentForm' => $commentForm,
         ]);
+    }
+
+    #[Route('/ticket/{id}/comment', name: 'ticket.comment', methods: ['POST'])]
+    public function addComment(Ticket $ticket, Request $req, EntityManagerInterface $em): Response
+    {
+        $this->denyAccessUnlessGranted('TICKET_VIEW', $ticket);
+
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $comment = new Comment();
+        $comment->setTicket($ticket);
+        $comment->setAuthor($user);
+
+        $form = $this->createForm(CommentType::class, $comment, [
+            'action' => $this->generateUrl('ticket.comment', ['id' => $ticket->getId()]),
+        ]);
+        $form->handleRequest($req);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $em->persist($comment);
+            $em->flush();
+            $this->addFlash('success', 'Commentaire ajouté.');
+        } else {
+            $this->addFlash('error', 'Le commentaire ne peut pas être vide.');
+        }
+
+        return $this->redirectToRoute('ticket.edit', ['id' => $ticket->getId()], Response::HTTP_SEE_OTHER);
     }
 
     #[Route('/ticket/{id}/delete', name: 'ticket.delete', methods: ['POST'])]
     public function deleteTicket(Ticket $ticket, Request $req, EntityManagerInterface $em): Response
     {
-        if($ticket->getOwner() !== $this->getUser()){
-            throw $this->createAccessDeniedException();
-        }
+        $this->denyAccessUnlessGranted('TICKET_DELETE', $ticket);
 
         if ($this->isCsrfTokenValid('delete' . $ticket->getId(), $req->request->get('_token'))) {
                 $em->remove($ticket);
@@ -94,10 +152,7 @@ final class TicketController extends AbstractController
     #[Route('/ticket/{id}/toggle', name:'ticket.toggle', methods: ['POST'])]
     public function toggleTicket(Ticket $ticket, Request $req, EntityManagerInterface $em):Response
     {
-        // verifier l'owner
-        if($ticket->getOwner() !== $this->getUser()){
-            throw $this->createAccessDeniedException();
-        }
+        $this->denyAccessUnlessGranted('TICKET_TOGGLE', $ticket);
 
         // verifier le CSRF
         if($this->isCsrfTokenValid('toggle' . $ticket->getId(), $req->request->get('_token'))){
@@ -105,10 +160,96 @@ final class TicketController extends AbstractController
             $em->flush();
         }
 
-        // redirect
+        // redirect en conservant les filtres actifs
+        $params = [];
         $q = $req->request->get('_q');
-        $params = $q ? ['q' => $q ] : [];
+        if (is_string($q) && '' !== $q) {
+            $params['q'] = $q;
+        }
+
+        $priority = $req->request->get('_priority');
+        if (is_string($priority) && null !== TicketPriority::tryFrom($priority)) {
+            $params['priority'] = $priority;
+        }
+
+        if ($req->request->getBoolean('_overdue')) {
+            $params['overdue'] = 1;
+        }
+
+        $sort = (string) $req->request->get('_tri');
+        if (TicketRepository::SORT_RECENT !== $sort && in_array($sort, TicketRepository::SORTS, true)) {
+            $params['tri'] = $sort;
+        }
 
         return $this->redirectToRoute('ticket.index', $params, Response::HTTP_SEE_OTHER);
+    }
+
+    #[Route('/ticket/export', name: 'ticket.export', methods: ['GET'])]
+    public function exportTickets(TicketRepository $ticketRepository, Request $req): Response
+    {
+        $filters = $this->readFilters($req);
+        $tickets = $ticketRepository->findVisibleTo(
+            $this->getUser(),
+            $filters['q'],
+            $filters['priority'],
+            $filters['overdue'],
+            $filters['sort'],
+        );
+
+        $handle = fopen('php://temp', 'r+');
+        fputcsv($handle, ['ID', 'Nom', 'Statut', 'Commentaire', 'Créé le', 'Priorité', 'Échéance'], ';', '"', '');
+
+        foreach ($tickets as $ticket) {
+            fputcsv($handle, [
+                $ticket->getId(),
+                $this->escapeSpreadsheetFormula($ticket->getName()),
+                $ticket->isDone() ? 'Terminé' : 'En cours',
+                $this->escapeSpreadsheetFormula($ticket->getComment()),
+                $ticket->getCreatedAt()?->format('d/m/Y H:i'),
+                $ticket->getPriority()->label(),
+                $ticket->getDueDate()?->format('d/m/Y'),
+            ], ';', '"', '');
+        }
+
+        rewind($handle);
+        $csv = "\xEF\xBB\xBF" . stream_get_contents($handle);
+        fclose($handle);
+
+        $response = new Response($csv);
+        $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
+        $response->headers->set('Content-Disposition', 'attachment; filename="tickets.csv"');
+
+        return $response;
+    }
+
+    /**
+     * Neutralises CSV/formula injection: a value starting with =, +, -, @ or a
+     * control character would be evaluated as a formula by spreadsheet apps.
+     */
+    private function escapeSpreadsheetFormula(?string $value): string
+    {
+        $value = (string) $value;
+
+        if ($value !== '' && str_contains("=+-@\t\r", $value[0])) {
+            return "'" . $value;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @return array{q: ?string, priority: ?TicketPriority, overdue: bool, sort: string}
+     */
+    private function readFilters(Request $req): array
+    {
+        $priority = $req->query->get('priority');
+        $sort = (string) $req->query->get('tri', TicketRepository::SORT_RECENT);
+
+        return [
+            'q' => $req->query->get('q'),
+            'priority' => is_string($priority) ? TicketPriority::tryFrom($priority) : null,
+            'overdue' => $req->query->getBoolean('overdue'),
+            'sort' => in_array($sort, TicketRepository::SORTS, true) ? $sort : TicketRepository::SORT_RECENT,
+        ];
     }
 }

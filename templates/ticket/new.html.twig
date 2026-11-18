@@ -41,6 +41,33 @@
                     {{ form_errors(form.name) }}
                 </div>
 
+                <div class="mb-5 grid gap-4 sm:grid-cols-2">
+                    <div class="space-y-2">
+                        {{ form_label(form.priority, null, {
+                            label_attr: { class: 'text-sm font-medium leading-none' }
+                        }) }}
+                        {{ form_widget(form.priority, {
+                            attr: {
+                                class: 'flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30'
+                            }
+                        }) }}
+                        {{ form_errors(form.priority) }}
+                    </div>
+
+                    <div class="space-y-2">
+                        {{ form_label(form.dueDate, null, {
+                            label_attr: { class: 'text-sm font-medium leading-none' }
+                        }) }}
+                        {{ form_widget(form.dueDate, {
+                            attr: {
+                                class: 'flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30'
+                            }
+                        }) }}
+                        {{ form_errors(form.dueDate) }}
+                        <p class="text-xs text-muted-foreground">{{ form.dueDate.vars.help }}</p>
+                    </div>
+                </div>
+
                 <div class="mb-5 space-y-2">
                     {{ form_label(form.comment, null, {
                         label_attr: { class: 'text-sm font-medium leading-none'}
@@ -71,6 +98,22 @@
                     </twig:Field:Group>
                     {{ form_errors(form.isDone) }}
                 </div>
+
+                {% if form.assignedTo is defined %}
+                    <div class="mb-6 space-y-2">
+                        {{ form_label(form.assignedTo, null, {
+                            label_attr: { class: 'text-sm font-medium leading-none' }
+                        }) }}
+
+                        {{ form_widget(form.assignedTo, {
+                            attr: {
+                                class: 'flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30'
+                            }
+                        }) }}
+
+                        {{ form_errors(form.assignedTo) }}
+                    </div>
+                {% endif %}
 
                 {# Actions #}
                 <div class="flex flex-wrap items-center gap-2">
