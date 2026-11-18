@@ -2,7 +2,6 @@
 
 namespace App\Controller;
 
-use App\Entity\Ticket;
 use App\Repository\TicketRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,21 +17,27 @@ final class DashboardController extends AbstractController
     {
         $user = $this->getUser();
 
-        $byOwner = $ticketRepository->countByOwner();
-        usort($byOwner, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
-
-        return $this->render('dashboard/index.html.twig', [
+        $data = [
             'myTotal' => $ticketRepository->countByOwnerAndStatus($user),
             'myOpen' => $ticketRepository->countByOwnerAndStatus($user, false),
             'myDone' => $ticketRepository->countByOwnerAndStatus($user, true),
             'assignedTotal' => $ticketRepository->countAssignedTo($user),
             'assignedOpen' => $ticketRepository->countAssignedTo($user, false),
+            'overdue' => $ticketRepository->countOverdueForUser($user),
             'latest' => $ticketRepository->findLatestForUser($user, 5),
-            'globalTotal' => $ticketRepository->countAll(),
-            'globalOpen' => $ticketRepository->countByStatus(false),
-            'globalDone' => $ticketRepository->countByStatus(true),
-            'byOwner' => $byOwner,
-        ]);
+        ];
+
+        // Global figures expose every account: reserved to administrators.
+        if ($this->isGranted('ROLE_ADMIN')) {
+            $byOwner = $ticketRepository->countByOwner();
+            usort($byOwner, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
+
+            $data['globalTotal'] = $ticketRepository->countAll();
+            $data['globalOpen'] = $ticketRepository->countByStatus(false);
+            $data['globalDone'] = $ticketRepository->countByStatus(true);
+            $data['byOwner'] = $byOwner;
+        }
+
+        return $this->render('dashboard/index.html.twig', $data);
     }
 }
-?>

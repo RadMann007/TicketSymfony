@@ -15,12 +15,20 @@
                     {% else %}
                         <twig:Badge variant="warning">En cours</twig:Badge>
                     {% endif %}
+                    <twig:Badge variant="{{ ticket.priority.badgeVariant }}">Priorité {{ ticket.priority.label|lower }}</twig:Badge>
+                    {% if ticket.isOverdue %}
+                        <twig:Badge variant="destructive">En retard</twig:Badge>
+                    {% endif %}
                 </div>
                 <p class="mt-2 text-sm text-muted-foreground">
                     Ticket #{{ ticket.id }} — créé le {{ ticket.createdAt|date('d/m/Y à H:i') }}
                     · assigné à
                     <span class="font-medium text-foreground">
                         {{ ticket.assignedTo ? ticket.assignedTo.email : 'personne' }}
+                    </span>
+                    · échéance
+                    <span class="font-medium text-foreground">
+                        {{ ticket.dueDate ? ticket.dueDate|date('d/m/Y') : 'aucune' }}
                     </span>
                 </p>
             </div>
@@ -60,6 +68,33 @@
                     />
 
                     {{ form_errors(form.name) }}
+                </div>
+
+                <div class="mb-5 grid gap-4 sm:grid-cols-2">
+                    <div class="space-y-2">
+                        {{ form_label(form.priority, null, {
+                            label_attr: { class: 'text-sm font-medium leading-none' }
+                        }) }}
+                        {{ form_widget(form.priority, {
+                            attr: {
+                                class: 'flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30'
+                            }
+                        }) }}
+                        {{ form_errors(form.priority) }}
+                    </div>
+
+                    <div class="space-y-2">
+                        {{ form_label(form.dueDate, null, {
+                            label_attr: { class: 'text-sm font-medium leading-none' }
+                        }) }}
+                        {{ form_widget(form.dueDate, {
+                            attr: {
+                                class: 'flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30'
+                            }
+                        }) }}
+                        {{ form_errors(form.dueDate) }}
+                        <p class="text-xs text-muted-foreground">{{ form.dueDate.vars.help }}</p>
+                    </div>
                 </div>
 
                 <div class="mb-5 space-y-2">

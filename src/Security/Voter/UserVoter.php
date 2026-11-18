@@ -4,39 +4,40 @@ namespace App\Security\Voter;
 
 use App\Entity\User;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+use Symfony\Component\Security\Core\Authorization\Voter\Vote;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 class UserVoter extends Voter
 {
-    public const VIEW = 'USER_VIEW';
     public const EDIT = 'USER_EDIT';
     public const DELETE = 'USER_DELETE';
 
     protected function supports(string $attribute, mixed $subject): bool
     {
-        return in_array($attribute, [self::VIEW, self::EDIT, self::DELETE], true)
+        return in_array($attribute, [self::EDIT, self::DELETE], true)
             && $subject instanceof User;
     }
 
-    protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token, ?\Symfony\Component\Security\Core\Authorization\Voter\Vote $vote = null): bool
+    protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token, ?Vote $vote = null): bool
     {
-        $user = $token->getUser();
-        if (!$user instanceof User) {
+        $currentUser = $token->getUser();
+        if (!$currentUser instanceof User) {
             return false;
         }
 
-        // Admins can do everything
-        if (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
-            // Prevent self-deletion / self-demotion edge cases handled in controller
-            return true;
+        // Only administrators manage user accounts.
+        if (!in_array('ROLE_ADMIN', $currentUser->getRoles(), true)) {
+            return false;
         }
 
-        // A user can view/edit themselves
-        if ($subject === $user && in_array($attribute, [self::VIEW, self::EDIT], true)) {
-            return true;
+        /** @var User $target */
+        $target = $subject;
+
+        // An admin cannot delete their own account.
+        if (self::DELETE === $attribute) {
+            return $target->getId() !== $currentUser->getId();
         }
 
-        return false;
+        return true;
     }
 }
-?>

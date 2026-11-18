@@ -5,6 +5,7 @@ namespace App\DataFixtures;
 use App\Entity\Comment;
 use App\Entity\Ticket;
 use App\Entity\User;
+use App\Enum\TicketPriority;
 use DateTimeImmutable;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
@@ -140,12 +141,29 @@ final class AppFixtures extends Fixture
             // Les tickets les plus récents restent ouverts pour rendre le dashboard vivant.
             $ticket->setIsDone($i >= 5 && mt_rand(1, 100) <= 55);
 
+            // Priorités pondérées : surtout des tickets normaux, quelques urgences.
+            $priorities = [
+                TicketPriority::High,
+                TicketPriority::Normal,
+                TicketPriority::Normal,
+                TicketPriority::Low,
+            ];
+            $ticket->setPriority($priorities[array_rand($priorities)]);
+
             $daysAgo = $i < 5 ? $i : mt_rand(5, 89);
             $ticket->setCreatedAt(
                 (new DateTimeImmutable('today'))
                     ->modify(sprintf('-%d days', $daysAgo))
                     ->setTime(mt_rand(8, 18), mt_rand(0, 59))
             );
+
+            // Les tickets ouverts ont une échéance, dont une partie déjà dépassée.
+            if (!$ticket->isDone()) {
+                $dueOffset = mt_rand(1, 100) <= 35 ? -mt_rand(1, 21) : mt_rand(1, 30);
+                $ticket->setDueDate((new DateTimeImmutable('today'))->modify(sprintf('%+d days', $dueOffset)));
+            } elseif (mt_rand(1, 100) <= 40) {
+                $ticket->setDueDate($ticket->getCreatedAt()->modify(sprintf('+%d days', mt_rand(1, 21))));
+            }
 
             $owner = $i < 5 ? $users[$i % count($users)] : $users[array_rand($users)];
             $ticket->setOwner($owner);

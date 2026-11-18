@@ -29,14 +29,16 @@
                         <tr class="border-b last:border-0">
                             <td class="px-4 py-3">{{ user.id }}</td>
                             <td class="px-4 py-3">{{ user.email }}</td>
-                            <td class="px-4 py-3 flex flex-wrap gap-1">
-                                {% for role in user.roles %}
-                                    {% if role == 'ROLE_ADMIN' %}
-                                        <twig:Badge variant="destructive">{{ role }}</twig:Badge>
-                                    {% else %}
-                                        <twig:Badge variant="secondary">{{ role }}</twig:Badge>
-                                    {% endif %}
-                                {% endfor %}
+                            <td class="px-4 py-3">
+                                <div class="flex flex-wrap gap-1">
+                                    {% for role in user.roles %}
+                                        {% if role == 'ROLE_ADMIN' %}
+                                            <twig:Badge variant="destructive">{{ role }}</twig:Badge>
+                                        {% else %}
+                                            <twig:Badge variant="secondary">{{ role }}</twig:Badge>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
                             </td>
                             <td class="px-4 py-3">{{ user.tickets|length }}</td>
                             <td class="px-4 py-3 text-right">

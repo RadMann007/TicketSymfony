@@ -4,6 +4,8 @@ namespace App\Repository;
 
 use App\Entity\Ticket;
 use App\Entity\User;
+use App\Enum\TicketPriority;
+use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -13,6 +15,16 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class TicketRepository extends ServiceEntityRepository
 {
+    public const SORT_RECENT = 'recent';
+    public const SORT_OLDEST = 'oldest';
+    public const SORT_PRIORITY = 'priority';
+    public const SORT_DUE = 'due';
+
+    /**
+     * @var list<string>
+     */
+    public const SORTS = [self::SORT_RECENT, self::SORT_OLDEST, self::SORT_PRIORITY, self::SORT_DUE];
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Ticket::class);
@@ -22,10 +34,10 @@ class TicketRepository extends ServiceEntityRepository
     {
         $qb = $this->createQueryBuilder('t')
         ->andWhere('t.owner = :owner')
-        ->setParameter('owner', $owner)
-        ->orderBy('t.id', 'ASC');
+        ->setParameter('owner', $owner);
 
         $this->applySearch($qb, $q);
+        $this->applySort($qb, self::SORT_RECENT);
 
         return $qb->getQuery()->getResult();
     }
@@ -33,14 +45,32 @@ class TicketRepository extends ServiceEntityRepository
     /**
      * Tickets owned by or assigned to the given user.
      */
-    public function findVisibleTo(User $user, ?string $q = null): array
-    {
+    public function findVisibleTo(
+        User $user,
+        ?string $q = null,
+        ?TicketPriority $priority = null,
+        bool $overdueOnly = false,
+        string $sort = self::SORT_RECENT,
+    ): array {
         $qb = $this->createQueryBuilder('t')
             ->andWhere('(t.owner = :user OR t.assignedTo = :user)')
-            ->setParameter('user', $user)
-            ->orderBy('t.id', 'ASC');
+            ->setParameter('user', $user);
 
         $this->applySearch($qb, $q);
+
+        if (null !== $priority) {
+            $qb->andWhere('t.priority = :priority')
+                ->setParameter('priority', $priority);
+        }
+
+        if ($overdueOnly) {
+            $qb->andWhere('t.isDone = false')
+                ->andWhere('t.dueDate IS NOT NULL')
+                ->andWhere('t.dueDate < :today')
+                ->setParameter('today', new DateTimeImmutable('today'));
+        }
+
+        $this->applySort($qb, $sort);
 
         return $qb->getQuery()->getResult();
     }
@@ -51,6 +81,24 @@ class TicketRepository extends ServiceEntityRepository
             $qb->andWhere('(t.name LIKE :q OR t.comment LIKE :q)')
                 ->setParameter('q', '%' . $q . '%');
         }
+    }
+
+    private function applySort(QueryBuilder $qb, string $sort): void
+    {
+        match ($sort) {
+            self::SORT_OLDEST => $qb->orderBy('t.createdAt', 'ASC'),
+            self::SORT_PRIORITY => $qb
+                ->addSelect("CASE t.priority WHEN 'high' THEN 3 WHEN 'normal' THEN 2 ELSE 1 END AS HIDDEN priorityWeight")
+                ->orderBy('priorityWeight', 'DESC')
+                ->addOrderBy('t.createdAt', 'DESC'),
+            self::SORT_DUE => $qb
+                ->addSelect('CASE WHEN t.dueDate IS NULL THEN 1 ELSE 0 END AS HIDDEN dueMissing')
+                ->orderBy('dueMissing', 'ASC')
+                ->addOrderBy('t.dueDate', 'ASC'),
+            default => $qb->orderBy('t.createdAt', 'DESC'),
+        };
+
+        $qb->addOrderBy('t.id', 'DESC');
     }
 
     public function countByOwnerAndStatus(User $owner, ?bool $isDone = null): int
@@ -105,6 +153,23 @@ class TicketRepository extends ServiceEntityRepository
         return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
+    /**
+     * Tickets visibles par l'utilisateur (possédés ou assignés) dont l'échéance est passée.
+     */
+    public function countOverdueForUser(User $user): int
+    {
+        return (int) $this->createQueryBuilder('t')
+            ->select('COUNT(t.id)')
+            ->andWhere('(t.owner = :user OR t.assignedTo = :user)')
+            ->andWhere('t.isDone = false')
+            ->andWhere('t.dueDate IS NOT NULL')
+            ->andWhere('t.dueDate < :today')
+            ->setParameter('user', $user)
+            ->setParameter('today', new DateTimeImmutable('today'))
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function countAll(): int
     {
         return (int) $this->createQueryBuilder('t')
@@ -124,27 +189,29 @@ class TicketRepository extends ServiceEntityRepository
     }
 
     /**
-     * @return array<int, array{owner: User, total: int, open: int, done: int}>
+     * @return array<int, array{ownerId: int, email: string, total: int, open: int, done: int}>
      */
     public function countByOwner(): array
     {
         $rows = $this->createQueryBuilder('t')
-            ->select('u.id AS ownerId, COUNT(t.id) AS total, SUM(CASE WHEN t.isDone = true THEN 1 ELSE 0 END) AS done')
+            ->select(
+                'u.id AS ownerId',
+                'u.email AS email',
+                'COUNT(t.id) AS total',
+                'SUM(CASE WHEN t.isDone = true THEN 1 ELSE 0 END) AS done'
+            )
             ->join('t.owner', 'u')
-            ->groupBy('u.id')
+            ->groupBy('u.id, u.email')
             ->getQuery()
             ->getArrayResult();
 
         $result = [];
         foreach ($rows as $row) {
-            $owner = $this->getEntityManager()->getRepository(User::class)->find($row['ownerId']);
-            if (!$owner) {
-                continue;
-            }
             $total = (int) $row['total'];
             $done = (int) $row['done'];
             $result[] = [
-                'owner' => $owner,
+                'ownerId' => (int) $row['ownerId'],
+                'email' => (string) $row['email'],
                 'total' => $total,
                 'done' => $done,
                 'open' => $total - $done,

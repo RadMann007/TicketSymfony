@@ -36,6 +36,20 @@
                 </div>
 
                 <div class="mb-5 space-y-2">
+                    {{ form_label(form.currentPassword, null, {
+                        label_attr: { class: 'text-sm font-medium leading-none' }
+                    }) }}
+                    <twig:Input
+                        id="{{ form.currentPassword.vars.id }}"
+                        name="{{ form.currentPassword.vars.full_name }}"
+                        type="password"
+                        placeholder="Votre mot de passe actuel"
+                    />
+                    {{ form_errors(form.currentPassword) }}
+                    {{ form_help(form.currentPassword) }}
+                </div>
+
+                <div class="mb-5 space-y-2">
                     {{ form_label(form.plainPassword.first, null, {
                         label_attr: { class: 'text-sm font-medium leading-none' }
                     }) }}

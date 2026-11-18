@@ -7,9 +7,22 @@
         <div class="mb-8">
             <h1 class="text-3xl font-bold tracking-tight">Rôles de {{ user.email }}</h1>
             <p class="mt-2 text-sm text-muted-foreground">
-                Sélectionnez les rôles à attribuer à cet utilisateur.
+                Cochez « Administrateur » pour donner les droits d'administration.
+                Le rôle utilisateur est attribué automatiquement à tous les comptes.
             </p>
         </div>
+
+        {% for type, messages in app.flashes(['success', 'error']) %}
+            {% for message in messages %}
+                <div class="mb-6 flex items-start gap-3 rounded-lg border p-4 text-sm
+                            {{ type == 'error'
+                                ? 'border-red-200 bg-red-50 text-red-800'
+                                : 'border-green-200 bg-green-50 text-green-800' }}">
+                    <span class="text-lg leading-none">{{ type == 'error' ? '⚠️' : '✅' }}</span>
+                    <span>{{ message }}</span>
+                </div>
+            {% endfor %}
+        {% endfor %}
 
         <div class="rounded-xl border bg-card p-6 shadow-sm">
             {{ form_start(form) }}
@@ -31,6 +44,7 @@
                         </twig:Field:Group>
                     {% endfor %}
                     {{ form_errors(form.roles) }}
+                    {{ form_help(form.roles) }}
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">

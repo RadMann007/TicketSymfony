@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Comment;
 use App\Entity\Ticket;
 use App\Entity\User;
+use App\Enum\TicketPriority;
 use App\Form\CommentType;
 use App\Form\TicketType;
 use App\Repository\TicketRepository;
@@ -21,17 +22,32 @@ final class TicketController extends AbstractController
     #[Route('/', name: 'ticket.index', methods: ['GET'])]
     public function index(TicketRepository $ticketRepository, Request $req, PaginatorInterface $paginator): Response
     {
-        $q = $req->query->get('q');
+        $filters = $this->readFilters($req);
 
         $pagination = $paginator->paginate(
-            $ticketRepository->findVisibleTo($this->getUser(), $q),
+            $ticketRepository->findVisibleTo(
+                $this->getUser(),
+                $filters['q'],
+                $filters['priority'],
+                $filters['overdue'],
+                $filters['sort'],
+            ),
             $req->query->getInt('page', 1),
             10
         );
 
         return $this->render('ticket/index.html.twig', [
             'pagination' => $pagination,
-            'q' => $q,
+            'q' => $filters['q'],
+            'priority' => $filters['priority'],
+            'overdue' => $filters['overdue'],
+            'sort' => $filters['sort'],
+            'sortOptions' => [
+                TicketRepository::SORT_RECENT => 'Plus récents',
+                TicketRepository::SORT_OLDEST => 'Plus anciens',
+                TicketRepository::SORT_PRIORITY => 'Priorité',
+                TicketRepository::SORT_DUE => 'Échéance',
+            ],
         ]);
     }
 
@@ -144,9 +160,26 @@ final class TicketController extends AbstractController
             $em->flush();
         }
 
-        // redirect
+        // redirect en conservant les filtres actifs
+        $params = [];
         $q = $req->request->get('_q');
-        $params = $q ? ['q' => $q ] : [];
+        if (is_string($q) && '' !== $q) {
+            $params['q'] = $q;
+        }
+
+        $priority = $req->request->get('_priority');
+        if (is_string($priority) && null !== TicketPriority::tryFrom($priority)) {
+            $params['priority'] = $priority;
+        }
+
+        if ($req->request->getBoolean('_overdue')) {
+            $params['overdue'] = 1;
+        }
+
+        $sort = (string) $req->request->get('_tri');
+        if (TicketRepository::SORT_RECENT !== $sort && in_array($sort, TicketRepository::SORTS, true)) {
+            $params['tri'] = $sort;
+        }
 
         return $this->redirectToRoute('ticket.index', $params, Response::HTTP_SEE_OTHER);
     }
@@ -154,19 +187,27 @@ final class TicketController extends AbstractController
     #[Route('/ticket/export', name: 'ticket.export', methods: ['GET'])]
     public function exportTickets(TicketRepository $ticketRepository, Request $req): Response
     {
-        $q = $req->query->get('q');
-        $tickets = $ticketRepository->findVisibleTo($this->getUser(), $q);
+        $filters = $this->readFilters($req);
+        $tickets = $ticketRepository->findVisibleTo(
+            $this->getUser(),
+            $filters['q'],
+            $filters['priority'],
+            $filters['overdue'],
+            $filters['sort'],
+        );
 
         $handle = fopen('php://temp', 'r+');
-        fputcsv($handle, ['ID', 'Nom', 'Statut', 'Commentaire', 'Créé le'], ';', '"', '');
+        fputcsv($handle, ['ID', 'Nom', 'Statut', 'Commentaire', 'Créé le', 'Priorité', 'Échéance'], ';', '"', '');
 
         foreach ($tickets as $ticket) {
             fputcsv($handle, [
                 $ticket->getId(),
-                $ticket->getName(),
+                $this->escapeSpreadsheetFormula($ticket->getName()),
                 $ticket->isDone() ? 'Terminé' : 'En cours',
-                $ticket->getComment(),
+                $this->escapeSpreadsheetFormula($ticket->getComment()),
                 $ticket->getCreatedAt()?->format('d/m/Y H:i'),
+                $ticket->getPriority()->label(),
+                $ticket->getDueDate()?->format('d/m/Y'),
             ], ';', '"', '');
         }
 
@@ -179,5 +220,36 @@ final class TicketController extends AbstractController
         $response->headers->set('Content-Disposition', 'attachment; filename="tickets.csv"');
 
         return $response;
+    }
+
+    /**
+     * Neutralises CSV/formula injection: a value starting with =, +, -, @ or a
+     * control character would be evaluated as a formula by spreadsheet apps.
+     */
+    private function escapeSpreadsheetFormula(?string $value): string
+    {
+        $value = (string) $value;
+
+        if ($value !== '' && str_contains("=+-@\t\r", $value[0])) {
+            return "'" . $value;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @return array{q: ?string, priority: ?TicketPriority, overdue: bool, sort: string}
+     */
+    private function readFilters(Request $req): array
+    {
+        $priority = $req->query->get('priority');
+        $sort = (string) $req->query->get('tri', TicketRepository::SORT_RECENT);
+
+        return [
+            'q' => $req->query->get('q'),
+            'priority' => is_string($priority) ? TicketPriority::tryFrom($priority) : null,
+            'overdue' => $req->query->getBoolean('overdue'),
+            'sort' => in_array($sort, TicketRepository::SORTS, true) ? $sort : TicketRepository::SORT_RECENT,
+        ];
     }
 }

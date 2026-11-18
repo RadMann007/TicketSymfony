@@ -5,6 +5,7 @@ namespace App\Tests\Controller;
 use App\Entity\Comment;
 use App\Entity\Ticket;
 use App\Entity\User;
+use App\Enum\TicketPriority;
 use App\Repository\TicketRepository;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,14 +41,26 @@ final class TicketControllerTest extends WebTestCase
         return $user;
     }
 
-    private function createTicket(User $owner, string $name = 'Ticket test', ?string $comment = null, bool $isDone = false): Ticket
-    {
+    private function createTicket(
+        User $owner,
+        string $name = 'Ticket test',
+        ?string $comment = null,
+        bool $isDone = false,
+        ?TicketPriority $priority = null,
+        ?DateTimeImmutable $dueDate = null,
+    ): Ticket {
         $ticket = new Ticket();
         $ticket->setName($name);
         $ticket->setIsDone($isDone);
         $ticket->setCreatedAt(new DateTimeImmutable());
         $ticket->setOwner($owner);
         $ticket->setComment($comment);
+
+        if (null !== $priority) {
+            $ticket->setPriority($priority);
+        }
+
+        $ticket->setDueDate($dueDate);
 
         $this->entityManager->persist($ticket);
         $this->entityManager->flush();
@@ -102,6 +115,62 @@ final class TicketControllerTest extends WebTestCase
         self::assertSelectorTextNotContains('body', 'Network issue');
     }
 
+    public function testIndexFiltersByPriority(): void
+    {
+        $user = $this->createUser();
+        $this->createTicket($user, 'Ticket urgent', null, false, TicketPriority::High);
+        $this->createTicket($user, 'Ticket secondaire', null, false, TicketPriority::Low);
+
+        $this->client->loginUser($user);
+        $this->client->request('GET', '/', ['priority' => 'high']);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Ticket urgent');
+        self::assertSelectorTextNotContains('body', 'Ticket secondaire');
+    }
+
+    public function testIndexFiltersOverdueTickets(): void
+    {
+        $user = $this->createUser();
+        $this->createTicket($user, 'Ticket en retard', null, false, null, new DateTimeImmutable('-3 days'));
+        $this->createTicket($user, 'Ticket à venir', null, false, null, new DateTimeImmutable('+3 days'));
+        $this->createTicket($user, 'Retard déjà réglé', null, true, null, new DateTimeImmutable('-3 days'));
+
+        $this->client->loginUser($user);
+        $this->client->request('GET', '/', ['overdue' => '1']);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Ticket en retard');
+        self::assertSelectorTextNotContains('body', 'Ticket à venir');
+        self::assertSelectorTextNotContains('body', 'Retard déjà réglé');
+    }
+
+    public function testIndexSortsByPriority(): void
+    {
+        $user = $this->createUser();
+        $this->createTicket($user, 'Priorité basse', null, false, TicketPriority::Low);
+        $this->createTicket($user, 'Priorité haute', null, false, TicketPriority::High);
+
+        $this->client->loginUser($user);
+        $this->client->request('GET', '/', ['tri' => 'priority']);
+
+        self::assertResponseIsSuccessful();
+
+        $ordered = static::getContainer()->get(TicketRepository::class)
+            ->findVisibleTo($user, null, null, false, TicketRepository::SORT_PRIORITY);
+        self::assertSame(
+            ['Priorité haute', 'Priorité basse'],
+            array_map(static fn (Ticket $ticket): ?string => $ticket->getName(), $ordered)
+        );
+
+        $html = (string) $this->client->getResponse()->getContent();
+        self::assertLessThan(
+            mb_strpos($html, 'Priorité basse'),
+            mb_strpos($html, 'Priorité haute'),
+            'Le ticket de priorité haute doit apparaître avant celui de priorité basse.'
+        );
+    }
+
     public function testNewGetDisplaysForm(): void
     {
         $user = $this->createUser();
@@ -122,6 +191,8 @@ final class TicketControllerTest extends WebTestCase
         $form['ticket[name]'] = 'New ticket from test';
         $form['ticket[comment]'] = 'A comment';
         $form['ticket[isDone]'] = '1';
+        $form['ticket[priority]']->select('high');
+        $form['ticket[dueDate]'] = '2026-12-31';
 
         $this->client->submit($form);
 
@@ -135,6 +206,8 @@ final class TicketControllerTest extends WebTestCase
         self::assertCount(1, $tickets);
         self::assertSame('New ticket from test', $tickets[0]->getName());
         self::assertTrue($tickets[0]->isDone());
+        self::assertSame(TicketPriority::High, $tickets[0]->getPriority());
+        self::assertSame('2026-12-31', $tickets[0]->getDueDate()?->format('Y-m-d'));
     }
 
     public function testEditGetDisplaysTicket(): void
@@ -160,6 +233,8 @@ final class TicketControllerTest extends WebTestCase
         $form = $crawler->selectButton('Enregistrer les modifications')->form();
         $form['ticket[name]'] = 'Updated name';
         $form['ticket[comment]'] = 'Updated comment';
+        $form['ticket[priority]']->select('high');
+        $form['ticket[dueDate]'] = '2026-12-24';
 
         $this->client->submit($form);
 
@@ -169,6 +244,8 @@ final class TicketControllerTest extends WebTestCase
         $updatedTicket = $ticketRepository->find($ticket->getId());
         self::assertSame('Updated name', $updatedTicket->getName());
         self::assertSame('Updated comment', $updatedTicket->getComment());
+        self::assertSame(TicketPriority::High, $updatedTicket->getPriority());
+        self::assertSame('2026-12-24', $updatedTicket->getDueDate()?->format('Y-m-d'));
     }
 
     public function testDeleteWithValidCsrfDeletesTicket(): void
@@ -206,6 +283,30 @@ final class TicketControllerTest extends WebTestCase
 
         $ticketRepository = static::getContainer()->get(TicketRepository::class);
         self::assertNotNull($ticketRepository->find($ticket->getId()));
+    }
+
+    public function testEditByNonOwnerIsForbidden(): void
+    {
+        $owner = $this->createUser('owner@test.com');
+        $other = $this->createUser('other@test.com');
+        $ticket = $this->createTicket($owner, 'Ticket privé');
+
+        $this->client->loginUser($other);
+
+        $this->client->request('GET', '/ticket/' . $ticket->getId() . '/edit');
+        self::assertResponseStatusCodeSame(403);
+
+        $this->client->request('POST', '/ticket/' . $ticket->getId() . '/edit', [
+            'ticket' => [
+                'name' => 'Ticket piraté',
+                'comment' => 'Modification non autorisée.',
+            ],
+        ]);
+        self::assertResponseStatusCodeSame(403);
+
+        $this->entityManager->clear();
+        $updated = $this->entityManager->getRepository(Ticket::class)->find($ticket->getId());
+        self::assertSame('Ticket privé', $updated->getName());
     }
 
     public function testDeleteByNonOwnerIsForbidden(): void
@@ -420,5 +521,52 @@ final class TicketControllerTest extends WebTestCase
         self::assertSelectorTextContains('body', 'Le commentaire ne peut pas être vide.');
 
         self::assertSame(0, $this->entityManager->getRepository(Comment::class)->count([]));
+    }
+
+    public function testExportNeutralizesSpreadsheetFormulas(): void
+    {
+        $owner = $this->createUser();
+        $malicious = $this->createTicket($owner, "=cmd|' /C calc'!A0", '@SUM(1+1)');
+        $normal = $this->createTicket($owner, 'Ticket normal', 'Commentaire normal');
+        $dated = $this->createTicket(
+            $owner,
+            'Ticket planifié',
+            null,
+            false,
+            TicketPriority::High,
+            new DateTimeImmutable('2026-12-31'),
+        );
+
+        $this->client->loginUser($owner);
+        $this->client->request('GET', '/ticket/export');
+
+        self::assertResponseIsSuccessful();
+        self::assertStringStartsWith('text/csv', (string) $this->client->getResponse()->headers->get('Content-Type'));
+
+        $csv = (string) $this->client->getResponse()->getContent();
+
+        $rows = [];
+        foreach (preg_split('/\r\n|\n/', trim($csv)) as $i => $line) {
+            if ($i === 0) {
+                continue; // header
+            }
+
+            $row = str_getcsv($line, ';', '"', '');
+            $rows[(int) $row[0]] = $row;
+        }
+
+        $maliciousRow = $rows[$malicious->getId()];
+        self::assertSame("'=cmd|' /C calc'!A0", $maliciousRow[1]);
+        self::assertSame("'@SUM(1+1)", $maliciousRow[3]);
+
+        $normalRow = $rows[$normal->getId()];
+        self::assertSame('Ticket normal', $normalRow[1]);
+        self::assertSame('Commentaire normal', $normalRow[3]);
+        self::assertSame('Normale', $normalRow[5]);
+        self::assertSame('', $normalRow[6]);
+
+        $datedRow = $rows[$dated->getId()];
+        self::assertSame('Haute', $datedRow[5]);
+        self::assertSame('31/12/2026', $datedRow[6]);
     }
 }

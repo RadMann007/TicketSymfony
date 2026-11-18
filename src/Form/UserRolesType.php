@@ -17,11 +17,11 @@ class UserRolesType extends AbstractType
             ->add('roles', ChoiceType::class, [
                 'label' => 'Rôles',
                 'choices' => [
-                    'Utilisateur' => 'ROLE_USER',
                     'Administrateur' => 'ROLE_ADMIN',
                 ],
                 'multiple' => true,
                 'expanded' => true,
+                'help' => 'ROLE_USER est attribué automatiquement à tous les comptes.',
             ])
             ->add('save', SubmitType::class, [
                 'label' => 'Enregistrer',
@@ -35,4 +35,3 @@ class UserRolesType extends AbstractType
         ]);
     }
 }
-?>
