@@ -51,6 +51,12 @@ class TicketRepository extends ServiceEntityRepository
         ?TicketPriority $priority = null,
         bool $overdueOnly = false,
         string $sort = self::SORT_RECENT,
+        ?bool $isDone = null,
+        ?User $assignee = null,
+        bool $unassignedOnly = false,
+        ?User $owner = null,
+        ?DateTimeImmutable $createdFrom = null,
+        ?DateTimeImmutable $createdTo = null,
     ): array {
         $qb = $this->createQueryBuilder('t')
             ->andWhere('(t.owner = :user OR t.assignedTo = :user)')
@@ -68,6 +74,34 @@ class TicketRepository extends ServiceEntityRepository
                 ->andWhere('t.dueDate IS NOT NULL')
                 ->andWhere('t.dueDate < :today')
                 ->setParameter('today', new DateTimeImmutable('today'));
+        }
+
+        if (null !== $isDone) {
+            $qb->andWhere('t.isDone = :isDone')
+                ->setParameter('isDone', $isDone);
+        }
+
+        if ($unassignedOnly) {
+            $qb->andWhere('t.assignedTo IS NULL');
+        } elseif (null !== $assignee) {
+            $qb->andWhere('t.assignedTo = :assignee')
+                ->setParameter('assignee', $assignee);
+        }
+
+        if (null !== $owner) {
+            $qb->andWhere('t.owner = :owner')
+                ->setParameter('owner', $owner);
+        }
+
+        if (null !== $createdFrom) {
+            $qb->andWhere('t.createdAt >= :createdFrom')
+                ->setParameter('createdFrom', $createdFrom);
+        }
+
+        if (null !== $createdTo) {
+            $createdTo = $createdTo->setTime(23, 59, 59);
+            $qb->andWhere('t.createdAt <= :createdTo')
+                ->setParameter('createdTo', $createdTo);
         }
 
         $this->applySort($qb, $sort);

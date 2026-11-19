@@ -2,14 +2,17 @@
 
 namespace App\Tests\Controller;
 
+use App\Entity\Attachment;
 use App\Entity\Comment;
 use App\Entity\Ticket;
 use App\Entity\User;
 use App\Enum\TicketPriority;
+use App\Repository\AttachmentRepository;
 use App\Repository\TicketRepository;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class TicketControllerTest extends WebTestCase
@@ -568,5 +571,43 @@ final class TicketControllerTest extends WebTestCase
         $datedRow = $rows[$dated->getId()];
         self::assertSame('Haute', $datedRow[5]);
         self::assertSame('31/12/2026', $datedRow[6]);
+    }
+
+    public function testUploadAndDeleteAttachment(): void
+    {
+        $user = $this->createUser();
+        $ticket = $this->createTicket($user, 'Ticket avec pièce jointe');
+
+        $this->client->loginUser($user);
+
+        $tmp = sys_get_temp_dir() . '/note.txt';
+        file_put_contents($tmp, 'hello world');
+
+        $crawler = $this->client->request('GET', '/ticket/' . $ticket->getId() . '/edit');
+        $form = $crawler->selectButton('Envoyer')->form();
+        $form['attachment']->upload($tmp);
+        $this->client->submit($form);
+
+        self::assertResponseRedirects('/ticket/' . $ticket->getId() . '/edit');
+
+        $attachmentRepository = static::getContainer()->get(AttachmentRepository::class);
+        $attachments = $attachmentRepository->findBy(['ticket' => $ticket]);
+        self::assertCount(1, $attachments);
+        self::assertSame('note.txt', $attachments[0]->getOriginalName());
+
+        $this->client->request('GET', '/ticket/attachment/' . $attachments[0]->getId() . '/download');
+        self::assertResponseIsSuccessful();
+
+        $crawler = $this->client->request('GET', '/ticket/' . $ticket->getId() . '/edit');
+        $token = $crawler
+            ->filter('form[action*="/ticket/attachment/' . $attachments[0]->getId() . '/delete"] input[name="_token"]')
+            ->attr('value');
+
+        $this->client->request('POST', '/ticket/attachment/' . $attachments[0]->getId() . '/delete', [
+            '_token' => $token,
+        ]);
+
+        self::assertResponseRedirects('/ticket/' . $ticket->getId() . '/edit');
+        self::assertCount(0, $attachmentRepository->findBy(['ticket' => $ticket]));
     }
 }

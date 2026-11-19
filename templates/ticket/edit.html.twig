@@ -158,6 +158,100 @@
             {{ form_end(form, {render_rest: false}) }}
         </div>
 
+        {# Pièces jointes #}
+        <section class="mt-6 overflow-hidden rounded-xl border bg-card shadow-sm">
+            <div class="border-b px-5 py-4">
+                <h2 class="text-base font-semibold">Pièces jointes</h2>
+                <p class="mt-0.5 text-xs text-muted-foreground">
+                    {{ ticket.attachments|length }} fichier{{ ticket.attachments|length > 1 ? 's' : '' }} · max 5 Mo
+                </p>
+            </div>
+
+            <div class="px-5 py-4">
+                <form method="post"
+                      action="{{ path('ticket.attachment.upload', {id: ticket.id}) }}"
+                      enctype="multipart/form-data"
+                      class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <input type="hidden" name="_token" value="{{ csrf_token('attachment' ~ ticket.id) }}">
+                    <input type="file" name="attachment" required
+                           class="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary-foreground hover:file:bg-primary/90">
+                    <twig:Button type="submit" size="sm" class="shrink-0">
+                        <twig:ux:icon name="lucide:upload" class="mr-1.5 size-3.5" />
+                        Envoyer
+                    </twig:Button>
+                </form>
+            </div>
+
+            {% if ticket.attachments is not empty %}
+                <ul class="divide-y border-t">
+                    {% for attachment in ticket.attachments %}
+                        <li class="flex items-center justify-between gap-3 px-5 py-2.5">
+                            <a href="{{ path('ticket.attachment.download', {id: attachment.id}) }}"
+                               class="flex min-w-0 items-center gap-2 text-sm hover:underline">
+                                <twig:ux:icon name="lucide:paperclip" class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                <span class="truncate">{{ attachment.originalName }}</span>
+                                <span class="shrink-0 text-xs text-muted-foreground">{{ attachment.humanSize() }}</span>
+                            </a>
+
+                            {% if is_granted('TICKET_EDIT', ticket) %}
+                                <form method="post"
+                                      action="{{ path('ticket.attachment.delete', {id: attachment.id}) }}"
+                                      class="inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('attachment_delete' ~ attachment.id) }}">
+                                    <twig:Button variant="ghost" size="icon" type="submit" title="Supprimer"
+                                                 class="size-7 text-destructive opacity-60 hover:opacity-100">
+                                        <twig:ux:icon name="lucide:trash-2" class="size-3.5" />
+                                    </twig:Button>
+                                </form>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </section>
+
+        {# Historique #}
+        <section class="mt-6 overflow-hidden rounded-xl border bg-card shadow-sm">
+            <div class="border-b px-5 py-4">
+                <h2 class="text-base font-semibold">Historique</h2>
+                <p class="mt-0.5 text-xs text-muted-foreground">
+                    {{ ticket.events|length }} événement{{ ticket.events|length > 1 ? 's' : '' }}
+                </p>
+            </div>
+
+            {% if ticket.events is empty %}
+                <div class="flex flex-col items-center gap-2 px-6 py-8 text-center">
+                    <twig:ux:icon name="lucide:history" class="size-8 text-muted-foreground/40" aria-hidden="true" />
+                    <p class="text-sm text-muted-foreground">Aucun événement pour le moment.</p>
+                </div>
+            {% else %}
+                <ul class="divide-y">
+                    {% for event in ticket.events %}
+                        <li class="flex gap-3 px-5 py-3">
+                            <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                                {{ event.actor ? event.actor.email|slice(0, 1)|upper : 'S' }}
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium">{{ event.label() }}</p>
+                                <p class="mt-0.5 break-words text-xs text-muted-foreground">
+                                    {% if event.oldValue is not null or event.newValue is not null %}
+                                        {% if event.oldValue is not null and event.oldValue != '' %}
+                                            <span class="line-through">{{ event.oldValue }}</span>
+                                            <span class="mx-1">→</span>
+                                        {% endif %}
+                                        {{ event.newValue }}
+                                        <span class="mx-1">·</span>
+                                    {% endif %}
+                                    {% if event.actor %}{{ event.actor.email }} · {% endif %}
+                                    {{ event.createdAt|date('d/m/Y à H:i') }}
+                                </p>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </section>
+
         {# Commentaires #}
         <section class="mt-6 overflow-hidden rounded-xl border bg-card shadow-sm">
             <div class="border-b px-5 py-4">
