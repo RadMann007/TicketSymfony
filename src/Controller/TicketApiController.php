@@ -37,7 +37,7 @@ final class TicketApiController extends AbstractController
     public function deleteTicketApi(Ticket $ticket, EntityManagerInterface $em): JsonResponse
     {
         $em->remove($ticket);
-        $em->flush()();
+        $em->flush();
 
         return new JsonResponse([null, Response::HTTP_NO_CONTENT]);
     }
@@ -53,7 +53,7 @@ final class TicketApiController extends AbstractController
         }
 
         $em->persist($ticket);
-        $em->flush()();
+        $em->flush();
 
         $jsonTicket = $serializer->serialize($ticket, 'json', ['groups' => 'getTickets']);
         $location = $urlGenerator->generate('detailTicketApi', ['id' => $ticket->getId()], UrlGeneratorInterface::ABSOLUTE_URL);

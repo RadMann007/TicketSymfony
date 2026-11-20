@@ -156,4 +156,9 @@ class TicketEvent
             default => 'Ticket modifié',
         };
     }
+
+    public static function statusLabel(bool $isDone): string
+    {
+        return $isDone ? 'Terminé' : 'En cours';
+    }
 }

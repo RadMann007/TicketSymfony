@@ -5,10 +5,13 @@ namespace App\Tests\Controller;
 use App\Entity\Attachment;
 use App\Entity\Comment;
 use App\Entity\Ticket;
+use App\Entity\TicketEvent;
 use App\Entity\User;
 use App\Enum\TicketPriority;
 use App\Repository\AttachmentRepository;
+use App\Repository\TicketEventRepository;
 use App\Repository\TicketRepository;
+use App\Service\AttachmentStorage;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -249,6 +252,50 @@ final class TicketControllerTest extends WebTestCase
         self::assertSame('Updated comment', $updatedTicket->getComment());
         self::assertSame(TicketPriority::High, $updatedTicket->getPriority());
         self::assertSame('2026-12-24', $updatedTicket->getDueDate()?->format('Y-m-d'));
+    }
+
+    public function testHistoryRecordsHumanReadableValues(): void
+    {
+        $admin = $this->createUser('admin@test.com', 'password', ['ROLE_ADMIN']);
+        $owner = $this->createUser('owner@test.com');
+        $ticket = $this->createTicket($owner, 'Ticket avec historique');
+        $ticketId = $ticket->getId();
+
+        $this->client->loginUser($admin);
+
+        $crawler = $this->client->request('GET', '/ticket/' . $ticketId . '/edit');
+        $form = $crawler->selectButton('Enregistrer les modifications')->form();
+        $form['ticket[priority]']->select('high');
+        $form['ticket[dueDate]'] = '2027-01-15';
+        $form['ticket[assignedTo]']->select((string) $owner->getId());
+        $this->client->submit($form);
+
+        self::assertResponseRedirects('/ticket/' . $ticketId . '/edit');
+
+        $this->client->loginUser($owner);
+        $crawler = $this->client->request('GET', '/');
+        $token = $crawler
+            ->filter('form[action*="/ticket/' . $ticketId . '/toggle"] input[name="_token"]')
+            ->attr('value');
+        $this->client->request('POST', '/ticket/' . $ticketId . '/toggle', ['_token' => $token]);
+
+        $events = static::getContainer()->get(TicketEventRepository::class)->findBy(['ticket' => $ticketId]);
+        $byType = [];
+        foreach ($events as $event) {
+            $byType[$event->getType()] = $event;
+        }
+
+        self::assertSame('Normale', $byType[TicketEvent::TYPE_PRIORITY_CHANGED]->getOldValue());
+        self::assertSame('Haute', $byType[TicketEvent::TYPE_PRIORITY_CHANGED]->getNewValue());
+
+        self::assertSame('Aucune', $byType[TicketEvent::TYPE_DUE_DATE_CHANGED]->getOldValue());
+        self::assertSame('15/01/2027', $byType[TicketEvent::TYPE_DUE_DATE_CHANGED]->getNewValue());
+
+        self::assertSame('Non assigné', $byType[TicketEvent::TYPE_ASSIGNED]->getOldValue());
+        self::assertSame('owner@test.com', $byType[TicketEvent::TYPE_ASSIGNED]->getNewValue());
+
+        self::assertSame('En cours', $byType[TicketEvent::TYPE_STATUS_CHANGED]->getOldValue());
+        self::assertSame('Terminé', $byType[TicketEvent::TYPE_STATUS_CHANGED]->getNewValue());
     }
 
     public function testDeleteWithValidCsrfDeletesTicket(): void
@@ -585,7 +632,7 @@ final class TicketControllerTest extends WebTestCase
 
         $crawler = $this->client->request('GET', '/ticket/' . $ticket->getId() . '/edit');
         $form = $crawler->selectButton('Envoyer')->form();
-        $form['attachment']->upload($tmp);
+        $form['attachment_upload[file]']->upload($tmp);
         $this->client->submit($form);
 
         self::assertResponseRedirects('/ticket/' . $ticket->getId() . '/edit');
@@ -594,6 +641,10 @@ final class TicketControllerTest extends WebTestCase
         $attachments = $attachmentRepository->findBy(['ticket' => $ticket]);
         self::assertCount(1, $attachments);
         self::assertSame('note.txt', $attachments[0]->getOriginalName());
+
+        $storage = static::getContainer()->get(AttachmentStorage::class);
+        $storedPath = $storage->path($attachments[0]->getStoredName());
+        self::assertFileExists($storedPath);
 
         $this->client->request('GET', '/ticket/attachment/' . $attachments[0]->getId() . '/download');
         self::assertResponseIsSuccessful();
@@ -609,5 +660,186 @@ final class TicketControllerTest extends WebTestCase
 
         self::assertResponseRedirects('/ticket/' . $ticket->getId() . '/edit');
         self::assertCount(0, $attachmentRepository->findBy(['ticket' => $ticket]));
+        self::assertFileDoesNotExist($storedPath);
+    }
+
+    public function testDeletingTicketRemovesAttachmentFiles(): void
+    {
+        $user = $this->createUser();
+        $ticket = $this->createTicket($user, 'Ticket à supprimer avec fichier');
+        $ticketId = $ticket->getId();
+
+        $this->client->loginUser($user);
+
+        $tmp = sys_get_temp_dir() . '/facture.txt';
+        file_put_contents($tmp, 'facture');
+
+        $crawler = $this->client->request('GET', '/ticket/' . $ticketId . '/edit');
+        $form = $crawler->selectButton('Envoyer')->form();
+        $form['attachment_upload[file]']->upload($tmp);
+        $this->client->submit($form);
+
+        self::assertResponseRedirects('/ticket/' . $ticketId . '/edit');
+
+        $attachmentRepository = static::getContainer()->get(AttachmentRepository::class);
+        $attachment = $attachmentRepository->findOneBy(['ticket' => $ticket]);
+        self::assertNotNull($attachment);
+
+        $storage = static::getContainer()->get(AttachmentStorage::class);
+        $storedPath = $storage->path($attachment->getStoredName());
+        self::assertFileExists($storedPath);
+
+        $crawler = $this->client->request('GET', '/');
+        $token = $crawler
+            ->filter('form[action*="/ticket/' . $ticketId . '/delete"] input[name="_token"]')
+            ->attr('value');
+
+        $this->client->request('POST', '/ticket/' . $ticketId . '/delete', [
+            '_token' => $token,
+        ]);
+
+        self::assertResponseRedirects('/');
+        self::assertNull(static::getContainer()->get(TicketRepository::class)->find($ticketId));
+        self::assertFileDoesNotExist($storedPath);
+    }
+
+    public function testAttachmentDownloadAndDeleteForbiddenForOtherUser(): void
+    {
+        $owner = $this->createUser('owner@test.com');
+        $other = $this->createUser('other@test.com');
+        $ticket = $this->createTicket($owner, 'Ticket avec pièce jointe');
+
+        $tmp = sys_get_temp_dir() . '/note.txt';
+        file_put_contents($tmp, 'hello world');
+
+        $this->client->loginUser($owner);
+        $crawler = $this->client->request('GET', '/ticket/' . $ticket->getId() . '/edit');
+        $form = $crawler->selectButton('Envoyer')->form();
+        $form['attachment_upload[file]']->upload($tmp);
+        $this->client->submit($form);
+        self::assertResponseRedirects('/ticket/' . $ticket->getId() . '/edit');
+
+        $attachment = static::getContainer()->get(AttachmentRepository::class)->findOneBy(['ticket' => $ticket]);
+        self::assertNotNull($attachment);
+
+        $this->client->loginUser($other);
+
+        $this->client->request('GET', '/ticket/attachment/' . $attachment->getId() . '/download');
+        self::assertResponseStatusCodeSame(403);
+
+        $this->client->request('POST', '/ticket/attachment/' . $attachment->getId() . '/delete');
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testUploadRejectsDisallowedFileType(): void
+    {
+        $user = $this->createUser();
+        $ticket = $this->createTicket($user, 'Ticket avec upload refusé');
+
+        $tmp = sys_get_temp_dir() . '/page.html';
+        file_put_contents($tmp, '<script>alert(1)</script>');
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/ticket/' . $ticket->getId() . '/edit');
+        $form = $crawler->selectButton('Envoyer')->form();
+        $form['attachment_upload[file]']->upload($tmp);
+        $this->client->submit($form);
+
+        self::assertResponseRedirects('/ticket/' . $ticket->getId() . '/edit');
+
+        $attachments = static::getContainer()->get(AttachmentRepository::class)->findBy(['ticket' => $ticket]);
+        self::assertCount(0, $attachments);
+    }
+
+    public function testHistoryRecordsCommentEvent(): void
+    {
+        $user = $this->createUser();
+        $ticket = $this->createTicket($user, 'Ticket historique commentaire');
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/ticket/' . $ticket->getId() . '/edit');
+        $form = $crawler->selectButton('Publier')->form();
+        $form['comment[content]'] = 'Premier commentaire.';
+        $this->client->submit($form);
+
+        self::assertResponseRedirects('/ticket/' . $ticket->getId() . '/edit');
+
+        $events = static::getContainer()->get(TicketEventRepository::class)->findBy(['ticket' => $ticket->getId()]);
+        $types = array_map(static fn (TicketEvent $e): string => $e->getType(), $events);
+        self::assertContains(TicketEvent::TYPE_COMMENT_ADDED, $types);
+
+        $commentEvent = null;
+        foreach ($events as $event) {
+            if (TicketEvent::TYPE_COMMENT_ADDED === $event->getType()) {
+                $commentEvent = $event;
+            }
+        }
+        self::assertNotNull($commentEvent);
+        self::assertSame('Premier commentaire.', $commentEvent->getNewValue());
+    }
+
+    public function testIndexFiltersByStatus(): void
+    {
+        $user = $this->createUser();
+        $this->createTicket($user, 'Ticket ouvert', null, false);
+        $this->createTicket($user, 'Ticket terminé', null, true);
+
+        $this->client->loginUser($user);
+        $this->client->request('GET', '/', ['status' => 'done']);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Ticket terminé');
+        self::assertSelectorTextNotContains('body', 'Ticket ouvert');
+    }
+
+    public function testIndexFiltersUnassignedTickets(): void
+    {
+        $user = $this->createUser();
+        $assignee = $this->createUser('assignee@test.com');
+        $this->createTicket($user, 'Ticket non assigné');
+        $assigned = $this->createTicket($user, 'Ticket assigné');
+        $assigned->setAssignedTo($assignee);
+        $this->entityManager->flush();
+
+        $this->client->loginUser($user);
+        $this->client->request('GET', '/', ['assignee' => 'none']);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Ticket non assigné');
+        self::assertSelectorTextNotContains('body', 'Ticket assigné');
+    }
+
+    public function testIndexFiltersByCreatedDateRange(): void
+    {
+        $user = $this->createUser();
+        $early = $this->createTicket($user, 'Ticket ancien');
+        $early->setCreatedAt(new DateTimeImmutable('2026-01-10 12:00:00'));
+        $late = $this->createTicket($user, 'Ticket récent');
+        $late->setCreatedAt(new DateTimeImmutable('2026-06-15 12:00:00'));
+        $this->entityManager->flush();
+
+        $this->client->loginUser($user);
+        $this->client->request('GET', '/', ['from' => '2026-06-01', 'to' => '2026-06-30']);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Ticket récent');
+        self::assertSelectorTextNotContains('body', 'Ticket ancien');
+    }
+
+    public function testAdminCanFilterByOwner(): void
+    {
+        $admin = $this->createUser('admin@test.com', 'password', ['ROLE_ADMIN']);
+        $ownerA = $this->createUser('ownerA@test.com');
+        $ownerB = $this->createUser('ownerB@test.com');
+
+        $this->createTicket($ownerA, 'Ticket de A');
+        $this->createTicket($ownerB, 'Ticket de B');
+
+        $this->client->loginUser($admin);
+        $this->client->request('GET', '/', ['owner' => $ownerA->getId()]);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Ticket de A');
+        self::assertSelectorTextNotContains('body', 'Ticket de B');
     }
 }

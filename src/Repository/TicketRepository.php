@@ -58,9 +58,14 @@ class TicketRepository extends ServiceEntityRepository
         ?DateTimeImmutable $createdFrom = null,
         ?DateTimeImmutable $createdTo = null,
     ): array {
-        $qb = $this->createQueryBuilder('t')
-            ->andWhere('(t.owner = :user OR t.assignedTo = :user)')
-            ->setParameter('user', $user);
+        $isAdmin = in_array('ROLE_ADMIN', $user->getRoles(), true);
+
+        $qb = $this->createQueryBuilder('t');
+
+        if (!$isAdmin) {
+            $qb->andWhere('(t.owner = :user OR t.assignedTo = :user)')
+                ->setParameter('user', $user);
+        }
 
         $this->applySearch($qb, $q);
 
@@ -99,8 +104,8 @@ class TicketRepository extends ServiceEntityRepository
         }
 
         if (null !== $createdTo) {
-            $createdTo = $createdTo->setTime(23, 59, 59);
-            $qb->andWhere('t.createdAt <= :createdTo')
+            $createdTo = $createdTo->modify('+1 day');
+            $qb->andWhere('t.createdAt < :createdTo')
                 ->setParameter('createdTo', $createdTo);
         }
 

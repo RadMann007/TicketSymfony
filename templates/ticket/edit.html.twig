@@ -168,18 +168,17 @@
             </div>
 
             <div class="px-5 py-4">
-                <form method="post"
-                      action="{{ path('ticket.attachment.upload', {id: ticket.id}) }}"
-                      enctype="multipart/form-data"
-                      class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <input type="hidden" name="_token" value="{{ csrf_token('attachment' ~ ticket.id) }}">
-                    <input type="file" name="attachment" required
-                           class="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary-foreground hover:file:bg-primary/90">
-                    <twig:Button type="submit" size="sm" class="shrink-0">
-                        <twig:ux:icon name="lucide:upload" class="mr-1.5 size-3.5" />
-                        Envoyer
-                    </twig:Button>
-                </form>
+                {{ form_start(uploadForm) }}
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        {{ form_widget(uploadForm.file) }}
+                        <twig:Button type="submit" size="sm" class="shrink-0">
+                            <twig:ux:icon name="lucide:upload" class="mr-1.5 size-3.5" />
+                            Envoyer
+                        </twig:Button>
+                    </div>
+                    {{ form_errors(uploadForm.file) }}
+                    {{ form_widget(uploadForm._token) }}
+                {{ form_end(uploadForm, {render_rest: false}) }}
             </div>
 
             {% if ticket.attachments is not empty %}

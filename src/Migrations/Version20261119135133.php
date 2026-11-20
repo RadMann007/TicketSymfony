@@ -14,7 +14,7 @@ final class Version20261119135133 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return '';
+        return 'Crée la table attachment pour les pièces jointes.';
     }
 
     public function up(Schema $schema): void
