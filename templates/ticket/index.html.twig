@@ -8,6 +8,11 @@
         priority: priority ? priority.value : null,
         overdue: overdue ? 1 : null,
         tri: sort != 'recent' ? sort : null,
+        status: status != 'all' ? status : null,
+        assignee: assignee,
+        owner: owner,
+        from: createdFrom ? createdFrom|date('Y-m-d') : null,
+        to: createdTo ? createdTo|date('Y-m-d') : null,
     } %}
     <div class="mx-auto w-full max-w-6xl px-4 py-6">
 
@@ -42,61 +47,153 @@
             </div>
         </div>
 
+        {% set selectClass = 'h-9 min-w-0 truncate rounded-lg border border-input bg-transparent px-2.5 text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30' %}
+        {% set advancedCount = (status != 'all' ? 1 : 0) + (assignee is not null ? 1 : 0) + (owner is not null ? 1 : 0) + (createdFrom or createdTo ? 1 : 0) %}
+        {% set hasAdvanced = advancedCount > 0 %}
+        {% set hasAnyFilter = q or priority or overdue or sort != 'recent' or hasAdvanced %}
+
         {# Recherche et filtres #}
         <form method="get" action="{{ path('ticket.index') }}"
-              class="mb-4 flex flex-col gap-2 rounded-xl border bg-card p-2 shadow-sm lg:flex-row lg:items-center">
+              class="mb-4 min-w-0 overflow-hidden rounded-xl border bg-card shadow-sm">
 
-            <div class="relative min-w-0 flex-1">
-                <twig:ux:icon name="lucide:search"
-                              class="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <twig:Input
-                    name="q"
-                    value="{{ q }}"
-                    placeholder="Rechercher un ticket..."
-                    class="h-8 pl-8 text-sm"
-                />
-            </div>
+            {# Barre principale : recherche, filtres rapides, actions #}
+            <div class="flex min-w-0 flex-col gap-2 p-2 xl:flex-row xl:items-center">
+                <div class="relative min-w-0 flex-1">
+                    <twig:ux:icon name="lucide:search"
+                                  class="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <twig:Input
+                        name="q"
+                        value="{{ q }}"
+                        placeholder="Rechercher un ticket..."
+                        class="h-9 w-full pl-8 text-sm"
+                    />
+                </div>
 
-            <div class="flex flex-wrap items-center gap-2">
-                <select name="priority"
-                        aria-label="Filtrer par priorité"
-                        class="h-8 rounded-lg border border-input bg-transparent px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30">
-                    <option value="">Toutes priorités</option>
-                    {% for value, label in {'high': 'Haute', 'normal': 'Normale', 'low': 'Basse'} %}
-                        <option value="{{ value }}" {{ priority and priority.value == value ? 'selected' }}>{{ label }}</option>
-                    {% endfor %}
-                </select>
+                <div class="flex min-w-0 flex-wrap items-center gap-2">
+                    <label for="filter-priority" class="sr-only">Priorité</label>
+                    <select id="filter-priority" name="priority"
+                            class="{{ selectClass }} w-auto min-w-[8.5rem] flex-1 sm:flex-none">
+                        <option value="">Toutes priorités</option>
+                        {% for value, label in {'high': 'Haute', 'normal': 'Normale', 'low': 'Basse'} %}
+                            <option value="{{ value }}" {{ priority and priority.value == value ? 'selected' }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
 
-                <label class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-input px-2 text-xs">
-                    <input type="checkbox" name="overdue" value="1" {{ overdue ? 'checked' }}
-                           class="size-3.5 rounded border-input accent-destructive">
-                    En retard
-                </label>
+                    <label class="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-input px-2.5 text-xs transition-colors hover:bg-muted/50 has-checked:border-destructive/40 has-checked:bg-destructive/5 has-checked:text-destructive">
+                        <input type="checkbox" name="overdue" value="1" {{ overdue ? 'checked' }}
+                               class="size-3.5 rounded border-input accent-destructive">
+                        En retard
+                    </label>
 
-                <select name="tri"
-                        aria-label="Trier les tickets"
-                        class="h-8 rounded-lg border border-input bg-transparent px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30">
-                    {% for value, label in sortOptions %}
-                        <option value="{{ value }}" {{ sort == value ? 'selected' }}>{{ label }}</option>
-                    {% endfor %}
-                </select>
+                    <label for="filter-sort" class="sr-only">Trier les tickets</label>
+                    <select id="filter-sort" name="tri"
+                            class="{{ selectClass }} w-auto min-w-[8.5rem] flex-1 sm:flex-none">
+                        {% for value, label in sortOptions %}
+                            <option value="{{ value }}" {{ sort == value ? 'selected' }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-                <twig:Button type="submit" variant="outline" size="sm">Filtrer</twig:Button>
-
-                {% if q or priority or overdue or sort != 'recent' %}
-                    <twig:Button as="a" href="{{ path('ticket.index') }}" variant="ghost" size="sm" title="Réinitialiser les filtres">
-                        <twig:ux:icon name="lucide:x" class="mr-1 size-3.5" />
-                        Effacer
+                <div class="flex min-w-0 items-center justify-end gap-2 xl:ml-auto">
+                    <twig:Button type="submit" size="sm" class="h-9">
+                        <twig:ux:icon name="lucide:filter" class="mr-1.5 size-3.5" />
+                        Filtrer
                     </twig:Button>
-                {% endif %}
+
+                    {% if hasAnyFilter %}
+                        <twig:Button as="a" href="{{ path('ticket.index') }}" variant="ghost" size="sm" class="h-9"
+                                     title="Réinitialiser les filtres">
+                            <twig:ux:icon name="lucide:x" class="mr-1.5 size-3.5" />
+                            Effacer
+                        </twig:Button>
+                    {% endif %}
+                </div>
             </div>
+
+            {# Filtres avancés : panneau dépliant pleine largeur, sous la barre principale #}
+            <details class="group border-t bg-muted/20" {{ hasAdvanced ? 'open' }}>
+                <summary class="flex cursor-pointer list-none select-none items-center gap-1.5 px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground [&::-webkit-details-marker]:hidden">
+                    <twig:ux:icon name="lucide:chevron-right"
+                                  class="size-3.5 shrink-0 transition-transform duration-150 group-open:rotate-90" />
+                    Filtres avancés
+                    {% if hasAdvanced %}
+                        <twig:Badge variant="secondary" class="ml-0.5">{{ advancedCount }} actif{{ advancedCount > 1 ? 's' }}</twig:Badge>
+                    {% endif %}
+                    <span class="ml-auto hidden text-[11px] font-normal sm:inline">Statut · Assignation · Propriétaire · Période</span>
+                </summary>
+
+                <div class="border-t px-3 py-3">
+                    <div class="grid min-w-0 grid-cols-1 gap-x-3 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div class="min-w-0 space-y-1.5">
+                            <label for="filter-status" class="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Statut</label>
+                            <select id="filter-status" name="status" class="{{ selectClass }} w-full">
+                                <option value="all" {{ status == 'all' ? 'selected' }}>Tous</option>
+                                <option value="open" {{ status == 'open' ? 'selected' }}>En cours</option>
+                                <option value="done" {{ status == 'done' ? 'selected' }}>Terminés</option>
+                            </select>
+                        </div>
+
+                        <div class="min-w-0 space-y-1.5">
+                            <label for="filter-assignee" class="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Assigné à</label>
+                            <select id="filter-assignee" name="assignee" class="{{ selectClass }} w-full">
+                                <option value="">Tous</option>
+                                <option value="none" {{ assignee == 'none' ? 'selected' }}>Non assignés</option>
+                                {% for u in users %}
+                                    <option value="{{ u.id }}" {{ assignee == u.id ? 'selected' }}>{{ u.email }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        {% if isAdmin %}
+                            <div class="min-w-0 space-y-1.5">
+                                <label for="filter-owner" class="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Propriétaire</label>
+                                <select id="filter-owner" name="owner" class="{{ selectClass }} w-full">
+                                    <option value="">Tous</option>
+                                    {% for u in users %}
+                                        <option value="{{ u.id }}" {{ owner == u.id ? 'selected' }}>{{ u.email }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        {% endif %}
+
+                        <div class="min-w-0 space-y-1.5">
+                            <span class="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Créé entre</span>
+                            <div class="grid min-w-0 grid-cols-2 gap-1.5">
+                                <label class="min-w-0">
+                                    <span class="sr-only">Date de début</span>
+                                    <input type="date" name="from" value="{{ createdFrom ? createdFrom|date('Y-m-d') : '' }}"
+                                           class="{{ selectClass }} w-full px-2">
+                                </label>
+                                <label class="min-w-0">
+                                    <span class="sr-only">Date de fin</span>
+                                    <input type="date" name="to" value="{{ createdTo ? createdTo|date('Y-m-d') : '' }}"
+                                           class="{{ selectClass }} w-full px-2">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap items-center justify-end gap-2 border-t pt-3">
+                        {% if hasAnyFilter %}
+                            <twig:Button as="a" href="{{ path('ticket.index') }}" variant="ghost" size="sm">
+                                <twig:ux:icon name="lucide:x" class="mr-1.5 size-3.5" />
+                                Réinitialiser
+                            </twig:Button>
+                        {% endif %}
+                        <twig:Button type="submit" size="sm">
+                            <twig:ux:icon name="lucide:filter" class="mr-1.5 size-3.5" />
+                            Appliquer les filtres
+                        </twig:Button>
+                    </div>
+                </div>
+            </details>
         </form>
 
         {# Liste des tickets #}
         <div class="overflow-hidden rounded-xl border bg-card shadow-sm">
             {% if pagination.getTotalItemCount() == 0 %}
                 <div class="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-                    {% if q or priority or overdue %}
+                    {% if hasAnyFilter %}
                         <twig:ux:icon name="lucide:search-x" class="size-10 text-muted-foreground/40" aria-hidden="true" />
                         <div>
                             <p class="text-sm font-medium">Aucun ticket ne correspond aux filtres</p>

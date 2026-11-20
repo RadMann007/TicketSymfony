@@ -60,9 +60,25 @@ class Ticket
     #[ORM\OrderBy(['createdAt' => 'ASC'])]
     private Collection $comments;
 
+    /**
+     * @var Collection<int, TicketEvent>
+     */
+    #[ORM\OneToMany(targetEntity: TicketEvent::class, mappedBy: 'ticket', cascade: ['remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['createdAt' => 'ASC'])]
+    private Collection $events;
+
+    /**
+     * @var Collection<int, Attachment>
+     */
+    #[ORM\OneToMany(targetEntity: Attachment::class, mappedBy: 'ticket', cascade: ['remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['createdAt' => 'ASC'])]
+    private Collection $attachments;
+
     public function __construct()
     {
         $this->comments = new ArrayCollection();
+        $this->events = new ArrayCollection();
+        $this->attachments = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -191,6 +207,53 @@ class Ticket
         if (!$this->comments->contains($comment)) {
             $this->comments->add($comment);
             $comment->setTicket($this);
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, TicketEvent>
+     */
+    public function getEvents(): Collection
+    {
+        return $this->events;
+    }
+
+    public function addEvent(TicketEvent $event): static
+    {
+        if (!$this->events->contains($event)) {
+            $this->events->add($event);
+            $event->setTicket($this);
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Attachment>
+     */
+    public function getAttachments(): Collection
+    {
+        return $this->attachments;
+    }
+
+    public function addAttachment(Attachment $attachment): static
+    {
+        if (!$this->attachments->contains($attachment)) {
+            $this->attachments->add($attachment);
+            $attachment->setTicket($this);
+        }
+
+        return $this;
+    }
+
+    public function removeAttachment(Attachment $attachment): static
+    {
+        if ($this->attachments->removeElement($attachment)) {
+            if ($attachment->getTicket() === $this) {
+                $attachment->setTicket(null);
+            }
         }
 
         return $this;
