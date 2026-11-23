@@ -44,6 +44,9 @@ class TicketRepository extends ServiceEntityRepository
 
     /**
      * Tickets owned by or assigned to the given user.
+     *
+     * Pass $seeAll = true (e.g. for an admin, whose TICKET_VIEW voter always
+     * grants access) to skip that restriction and reach every ticket.
      */
     public function findVisibleTo(
         User $user,
@@ -57,12 +60,11 @@ class TicketRepository extends ServiceEntityRepository
         ?User $owner = null,
         ?DateTimeImmutable $createdFrom = null,
         ?DateTimeImmutable $createdTo = null,
+        bool $seeAll = false,
     ): array {
-        $isAdmin = in_array('ROLE_ADMIN', $user->getRoles(), true);
-
         $qb = $this->createQueryBuilder('t');
 
-        if (!$isAdmin) {
+        if (!$seeAll) {
             $qb->andWhere('(t.owner = :user OR t.assignedTo = :user)')
                 ->setParameter('user', $user);
         }

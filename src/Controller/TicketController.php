@@ -43,6 +43,7 @@ final class TicketController extends AbstractController
                 $filters['owner'],
                 $filters['createdFrom'],
                 $filters['createdTo'],
+                $this->isGranted('ROLE_ADMIN'),
             ),
             $req->query->getInt('page', 1),
             10
@@ -326,6 +327,7 @@ final class TicketController extends AbstractController
             $filters['owner'],
             $filters['createdFrom'],
             $filters['createdTo'],
+            $this->isGranted('ROLE_ADMIN'),
         );
 
         $handle = fopen('php://temp', 'r+');

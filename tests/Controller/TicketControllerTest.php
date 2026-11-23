@@ -842,4 +842,23 @@ final class TicketControllerTest extends WebTestCase
         self::assertSelectorTextContains('body', 'Ticket de A');
         self::assertSelectorTextNotContains('body', 'Ticket de B');
     }
+
+    public function testAdminCanFilterByAssignee(): void
+    {
+        $admin = $this->createUser('admin@test.com', 'password', ['ROLE_ADMIN']);
+        $owner = $this->createUser('owner@test.com');
+        $assignee = $this->createUser('assignee@test.com');
+
+        $ticket = $this->createTicket($owner, 'Ticket assigné à Y');
+        $ticket->setAssignedTo($assignee);
+        $this->createTicket($owner, 'Ticket sans assigné');
+        $this->entityManager->flush();
+
+        $this->client->loginUser($admin);
+        $this->client->request('GET', '/', ['assignee' => $assignee->getId()]);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Ticket assigné à Y');
+        self::assertSelectorTextNotContains('body', 'Ticket sans assigné');
+    }
 }
