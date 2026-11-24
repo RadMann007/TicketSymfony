@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rappel d'échéance</title>
+</head>
+<body style="margin:0; padding:24px; background-color:#f4f4f5; font-family:Arial, Helvetica, sans-serif; color:#18181b;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; margin:0 auto; background-color:#ffffff; border:1px solid #e4e4e7; border-radius:8px;">
+        <tr>
+            <td style="padding:24px;">
+                <p style="margin:0 0 16px; font-size:14px;">Bonjour {{ recipient.email }},</p>
+
+                <p style="margin:0 0 16px; font-size:14px; line-height:1.5;">
+                    {% if daysUntilDue < 0 %}
+                        Le ticket <strong>#{{ ticket.id }} — {{ ticket.name }}</strong> était attendu le
+                        <strong>{{ ticket.dueDate|date('d/m/Y') }}</strong> : il est en retard de
+                        <strong>{{ -daysUntilDue }} jour(s)</strong>.
+                    {% else %}
+                        Le ticket <strong>#{{ ticket.id }} — {{ ticket.name }}</strong> arrive à échéance
+                        <strong>demain</strong>, le {{ ticket.dueDate|date('d/m/Y') }}.
+                    {% endif %}
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px; font-size:14px;">
+                    <tr>
+                        <td style="padding:2px 12px 2px 0; color:#71717a;">Priorité</td>
+                        <td style="padding:2px 0;"><strong>{{ ticket.priority.label }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:2px 12px 2px 0; color:#71717a;">Échéance</td>
+                        <td style="padding:2px 0;">{{ ticket.dueDate|date('d/m/Y') }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:2px 12px 2px 0; color:#71717a;">Propriétaire</td>
+                        <td style="padding:2px 0;">{{ ticket.owner.email }}</td>
+                    </tr>
+                    {% if ticket.assignedTo %}
+                        <tr>
+                            <td style="padding:2px 12px 2px 0; color:#71717a;">Assigné à</td>
+                            <td style="padding:2px 0;">{{ ticket.assignedTo.email }}</td>
+                        </tr>
+                    {% endif %}
+                </table>
+
+                {% if ticket.comment %}
+                    <p style="margin:0 0 16px; padding:12px; background-color:#fafafa; border-left:3px solid #d4d4d8; font-size:14px; line-height:1.5; white-space:pre-line;">{{ ticket.comment }}</p>
+                {% endif %}
+
+                <p style="margin:0; font-size:13px; line-height:1.5; color:#71717a;">
+                    Vous recevez ce message en tant que propriétaire ou personne assignée à ce ticket.
+                </p>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

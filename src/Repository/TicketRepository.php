@@ -211,6 +211,31 @@ class TicketRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    /**
+     * Tickets non terminés dont l'échéance est demain ou déjà passée.
+     *
+     * Les tickets dus aujourd'hui sont volontairement exclus : ils ont déjà
+     * fait l'objet du rappel de la veille.
+     *
+     * @return list<Ticket>
+     */
+    public function findDeadlineReminders(DateTimeImmutable $today): array
+    {
+        return $this->createQueryBuilder('t')
+            ->addSelect('o', 'a')
+            ->leftJoin('t.owner', 'o')
+            ->leftJoin('t.assignedTo', 'a')
+            ->andWhere('t.isDone = false')
+            ->andWhere('t.dueDate IS NOT NULL')
+            ->andWhere('t.dueDate < :today OR t.dueDate = :tomorrow')
+            ->setParameter('today', $today)
+            ->setParameter('tomorrow', $today->modify('+1 day'))
+            ->orderBy('t.dueDate', 'ASC')
+            ->addOrderBy('t.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     public function countAll(): int
     {
         return (int) $this->createQueryBuilder('t')

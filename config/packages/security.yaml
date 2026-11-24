@@ -16,6 +16,12 @@ security:
             # Ensure dev tools and static assets are always allowed
             pattern: ^/(_profiler(/|$)|(_wdt|assets|build)/)
             security: false
+        api:
+            # API stateless authentifiée par HTTP Basic (email + mot de passe).
+            pattern: ^/api
+            stateless: true
+            provider: app_user_provider
+            http_basic: ~
         main:
             lazy: true
             provider: app_user_provider
@@ -42,7 +48,7 @@ security:
     # Note: Only the *first* matching rule is applied
     access_control:
         - { path: ^/login, roles: PUBLIC_ACCESS }
-        - { path: ^/api, roles: PUBLIC_ACCESS }
+        - { path: ^/api, roles: ROLE_USER }
         - { path: ^/register, roles: PUBLIC_ACCESS }
         # - { path: ^/$, roles: PUBLIC_ACCESS }
 
