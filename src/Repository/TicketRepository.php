@@ -44,6 +44,9 @@ class TicketRepository extends ServiceEntityRepository
 
     /**
      * Tickets owned by or assigned to the given user.
+     *
+     * Pass $seeAll = true (e.g. for an admin, whose TICKET_VIEW voter always
+     * grants access) to skip that restriction and reach every ticket.
      */
     public function findVisibleTo(
         User $user,
@@ -51,10 +54,20 @@ class TicketRepository extends ServiceEntityRepository
         ?TicketPriority $priority = null,
         bool $overdueOnly = false,
         string $sort = self::SORT_RECENT,
+        ?bool $isDone = null,
+        ?User $assignee = null,
+        bool $unassignedOnly = false,
+        ?User $owner = null,
+        ?DateTimeImmutable $createdFrom = null,
+        ?DateTimeImmutable $createdTo = null,
+        bool $seeAll = false,
     ): array {
-        $qb = $this->createQueryBuilder('t')
-            ->andWhere('(t.owner = :user OR t.assignedTo = :user)')
-            ->setParameter('user', $user);
+        $qb = $this->createQueryBuilder('t');
+
+        if (!$seeAll) {
+            $qb->andWhere('(t.owner = :user OR t.assignedTo = :user)')
+                ->setParameter('user', $user);
+        }
 
         $this->applySearch($qb, $q);
 
@@ -68,6 +81,34 @@ class TicketRepository extends ServiceEntityRepository
                 ->andWhere('t.dueDate IS NOT NULL')
                 ->andWhere('t.dueDate < :today')
                 ->setParameter('today', new DateTimeImmutable('today'));
+        }
+
+        if (null !== $isDone) {
+            $qb->andWhere('t.isDone = :isDone')
+                ->setParameter('isDone', $isDone);
+        }
+
+        if ($unassignedOnly) {
+            $qb->andWhere('t.assignedTo IS NULL');
+        } elseif (null !== $assignee) {
+            $qb->andWhere('t.assignedTo = :assignee')
+                ->setParameter('assignee', $assignee);
+        }
+
+        if (null !== $owner) {
+            $qb->andWhere('t.owner = :owner')
+                ->setParameter('owner', $owner);
+        }
+
+        if (null !== $createdFrom) {
+            $qb->andWhere('t.createdAt >= :createdFrom')
+                ->setParameter('createdFrom', $createdFrom);
+        }
+
+        if (null !== $createdTo) {
+            $createdTo = $createdTo->modify('+1 day');
+            $qb->andWhere('t.createdAt < :createdTo')
+                ->setParameter('createdTo', $createdTo);
         }
 
         $this->applySort($qb, $sort);
