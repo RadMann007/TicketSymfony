@@ -38,12 +38,23 @@ final class DashboardControllerTest extends WebTestCase
         return $user;
     }
 
-    private function createTicket(User $owner, string $name, bool $isDone = false, ?DateTimeImmutable $dueDate = null): Ticket
-    {
+    private function createTicket(
+        User $owner,
+        string $name,
+        bool $isDone = false,
+        ?DateTimeImmutable $dueDate = null,
+        ?DateTimeImmutable $createdAt = null,
+        ?DateTimeImmutable $completedAt = null,
+    ): Ticket {
         $ticket = new Ticket();
         $ticket->setName($name);
+        $ticket->setCreatedAt($createdAt ?? new DateTimeImmutable());
         $ticket->setIsDone($isDone);
-        $ticket->setCreatedAt(new DateTimeImmutable());
+
+        if (null !== $completedAt) {
+            $ticket->setCompletedAt($completedAt);
+        }
+
         $ticket->setOwner($owner);
         $ticket->setDueDate($dueDate);
 
@@ -124,5 +135,66 @@ final class DashboardControllerTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'Aucun ticket pour le moment');
+        self::assertSelectorTextContains('#analytics', 'Aucun ticket terminé pour le moment.');
+        self::assertSelectorTextContains('#analytics', 'Aucun ticket en cours.');
+    }
+
+    public function testDashboardShowsResolutionAnalytics(): void
+    {
+        $user = $this->createUser('alice@test.com');
+        $now = new DateTimeImmutable();
+
+        $this->createTicket(
+            $user,
+            'Terminé en quatre jours',
+            true,
+            dueDate: $now->modify('-5 days'),
+            createdAt: $now->modify('-10 days'),
+            completedAt: $now->modify('-6 days'),
+        );
+
+        $this->client->loginUser($user);
+        $this->client->request('GET', '/dashboard');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('#analytics', 'Temps moyen de résolution');
+        self::assertSelectorTextContains('#analytics', '4,0 jours');
+        self::assertSelectorTextContains('#analytics', '100%');
+        self::assertSelectorTextContains('#analytics', 'Sur 1 ticket terminé');
+    }
+
+    public function testDashboardAnalyticsAreScopedToVisibleTickets(): void
+    {
+        $user = $this->createUser('alice@test.com');
+        $other = $this->createUser('bob@test.com');
+        $now = new DateTimeImmutable();
+
+        $this->createTicket($user, 'Le mien', true, createdAt: $now->modify('-4 days'), completedAt: $now->modify('-2 days'));
+        $this->createTicket($other, 'Celui de Bob', true, createdAt: $now->modify('-40 days'), completedAt: $now->modify('-10 days'));
+
+        $this->client->loginUser($user);
+        $this->client->request('GET', '/dashboard');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('#analytics', '2,0 jours');
+        self::assertSelectorTextNotContains('#analytics', '30,0 jours');
+    }
+
+    public function testAdminSeesGlobalAnalytics(): void
+    {
+        $admin = $this->createUser('admin@test.com', ['ROLE_ADMIN']);
+        $other = $this->createUser('bob@test.com');
+        $now = new DateTimeImmutable();
+
+        $this->createTicket($admin, 'Ticket admin', true, createdAt: $now->modify('-3 days'), completedAt: $now->modify('-2 days'));
+        $this->createTicket($other, 'Ticket de Bob', true, createdAt: $now->modify('-9 days'), completedAt: $now->modify('-1 day'));
+
+        $this->client->loginUser($admin);
+        $this->client->request('GET', '/dashboard');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('#analytics', "Sur l'ensemble des tickets");
+        self::assertSelectorTextContains('#analytics', '4,5 jours');
+        self::assertSelectorTextContains('#analytics', 'Sur 2 tickets terminés');
     }
 }

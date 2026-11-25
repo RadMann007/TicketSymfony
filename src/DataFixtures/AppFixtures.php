@@ -151,11 +151,17 @@ final class AppFixtures extends Fixture
             $ticket->setPriority($priorities[array_rand($priorities)]);
 
             $daysAgo = $i < 5 ? $i : mt_rand(5, 89);
-            $ticket->setCreatedAt(
-                (new DateTimeImmutable('today'))
-                    ->modify(sprintf('-%d days', $daysAgo))
-                    ->setTime(mt_rand(8, 18), mt_rand(0, 59))
-            );
+            $createdAt = (new DateTimeImmutable('today'))
+                ->modify(sprintf('-%d days', $daysAgo))
+                ->setTime(mt_rand(8, 18), mt_rand(0, 59));
+            $ticket->setCreatedAt($createdAt);
+
+            // Un ticket terminé a une date de complétion plausible, postérieure à sa création.
+            if ($ticket->isDone()) {
+                $completedAt = $createdAt->modify(sprintf('+%d days', mt_rand(1, 21)));
+                $now = new DateTimeImmutable();
+                $ticket->setCompletedAt($completedAt > $now ? $now : $completedAt);
+            }
 
             // Les tickets ouverts ont une échéance, dont une partie déjà dépassée.
             if (!$ticket->isDone()) {

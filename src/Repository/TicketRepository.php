@@ -64,11 +64,7 @@ class TicketRepository extends ServiceEntityRepository
     ): array {
         $qb = $this->createQueryBuilder('t');
 
-        if (!$seeAll) {
-            $qb->andWhere('(t.owner = :user OR t.assignedTo = :user)')
-                ->setParameter('user', $user);
-        }
-
+        $this->applyVisibility($qb, $user, $seeAll);
         $this->applySearch($qb, $q);
 
         if (null !== $priority) {
@@ -122,6 +118,20 @@ class TicketRepository extends ServiceEntityRepository
             $qb->andWhere('(t.name LIKE :q OR t.comment LIKE :q)')
                 ->setParameter('q', '%' . $q . '%');
         }
+    }
+
+    /**
+     * Restreint la requête aux tickets visibles par l'utilisateur, sauf si
+     * celui-ci peut tout voir (administrateur).
+     */
+    private function applyVisibility(QueryBuilder $qb, User $user, bool $seeAll): void
+    {
+        if ($seeAll) {
+            return;
+        }
+
+        $qb->andWhere('(t.owner = :user OR t.assignedTo = :user)')
+            ->setParameter('user', $user);
     }
 
     private function applySort(QueryBuilder $qb, string $sort): void
@@ -234,6 +244,20 @@ class TicketRepository extends ServiceEntityRepository
             ->addOrderBy('t.id', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Tickets visibles nécessaires au calcul des indicateurs du tableau de bord.
+     *
+     * @return list<Ticket>
+     */
+    public function findForAnalytics(User $user, bool $seeAll): array
+    {
+        $qb = $this->createQueryBuilder('t');
+
+        $this->applyVisibility($qb, $user, $seeAll);
+
+        return $qb->getQuery()->getResult();
     }
 
     public function countAll(): int

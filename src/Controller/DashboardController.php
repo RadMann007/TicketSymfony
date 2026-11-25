@@ -2,7 +2,9 @@
 
 namespace App\Controller;
 
+use App\Entity\User;
 use App\Repository\TicketRepository;
+use App\Service\DashboardAnalytics;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -13,9 +15,13 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class DashboardController extends AbstractController
 {
     #[Route('', name: 'index', methods: ['GET'])]
-    public function index(TicketRepository $ticketRepository): Response
+    public function index(TicketRepository $ticketRepository, DashboardAnalytics $analytics): Response
     {
         $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
 
         $data = [
             'myTotal' => $ticketRepository->countByOwnerAndStatus($user),
@@ -37,6 +43,8 @@ final class DashboardController extends AbstractController
             $data['globalDone'] = $ticketRepository->countByStatus(true);
             $data['byOwner'] = $byOwner;
         }
+
+        $data['analytics'] = $analytics->summarize($user, $this->isGranted('ROLE_ADMIN'));
 
         return $this->render('dashboard/index.html.twig', $data);
     }
