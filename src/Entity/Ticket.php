@@ -33,6 +33,10 @@ class Ticket
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
+    #[ORM\Column(nullable: true)]
+    #[Groups(["getTickets"])]
+    private ?\DateTimeImmutable $completedAt = null;
+
     #[ORM\Column(length: 10, enumType: TicketPriority::class, options: ['default' => 'normal'])]
     #[Groups(["getTickets"])]
     private TicketPriority $priority = TicketPriority::Normal;
@@ -107,6 +111,13 @@ class Ticket
     {
         $this->isDone = $isDone;
 
+        if ($isDone) {
+            // Conserve la date de la première complétion si le ticket reste terminé.
+            $this->completedAt ??= new \DateTimeImmutable();
+        } else {
+            $this->completedAt = null;
+        }
+
         return $this;
     }
 
@@ -118,6 +129,18 @@ class Ticket
     public function setCreatedAt(\DateTimeImmutable $createdAt): static
     {
         $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    public function getCompletedAt(): ?\DateTimeImmutable
+    {
+        return $this->completedAt;
+    }
+
+    public function setCompletedAt(?\DateTimeImmutable $completedAt): static
+    {
+        $this->completedAt = $completedAt;
 
         return $this;
     }

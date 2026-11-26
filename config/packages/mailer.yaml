@@ -1,3 +1,10 @@
 framework:
     mailer:
         dsn: '%env(MAILER_DSN)%'
+
+when@test:
+    framework:
+        mailer:
+            # En test, envoyer les emails de façon synchrone pour que
+            # MailerAssertionsTrait puisse les inspecter.
+            message_bus: false

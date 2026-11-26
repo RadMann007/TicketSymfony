@@ -194,6 +194,129 @@
             </div>
         </section>
 
+        {# ─── Analyse ─── #}
+        <section id="analytics">
+            <div class="mb-3 flex items-end justify-between">
+                <div>
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Analyse</h2>
+                    <p class="mt-0.5 text-xs text-muted-foreground">
+                        {% if is_granted('ROLE_ADMIN') %}
+                            Sur l'ensemble des tickets.
+                        {% else %}
+                            Sur vos tickets (créés ou assignés).
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                {# Temps moyen de résolution #}
+                <div class="rounded-xl border bg-card p-5 shadow-sm">
+                    <p class="text-xs font-medium text-muted-foreground">Temps moyen de résolution</p>
+                    <p class="mt-2 text-3xl font-semibold leading-none tracking-tight tabular-nums">
+                        {% if analytics.averageResolutionDays is not null %}
+                            {{ analytics.averageResolutionDays|number_format(1, ',', ' ') }}
+                            <span class="text-base font-medium text-muted-foreground">jours</span>
+                        {% else %}
+                            <span class="text-muted-foreground">—</span>
+                        {% endif %}
+                    </p>
+                    <p class="mt-3 text-xs text-muted-foreground">
+                        {% if analytics.resolvedCount > 0 %}
+                            Sur {{ analytics.resolvedCount }} ticket{{ analytics.resolvedCount > 1 ? 's' : '' }}
+                            terminé{{ analytics.resolvedCount > 1 ? 's' : '' }}.
+                        {% else %}
+                            Aucun ticket terminé pour le moment.
+                        {% endif %}
+                    </p>
+                </div>
+
+                {# Échéances respectées #}
+                <div class="rounded-xl border bg-card p-5 shadow-sm">
+                    <p class="text-xs font-medium text-muted-foreground">Échéances respectées</p>
+                    <p class="mt-2 text-3xl font-semibold leading-none tracking-tight tabular-nums {{ analytics.onTimeRate is not null and analytics.onTimeRate < 70 ? 'text-destructive' : '' }}">
+                        {% if analytics.onTimeRate is not null %}
+                            {{ analytics.onTimeRate }}<span class="text-base font-medium text-muted-foreground">%</span>
+                        {% else %}
+                            <span class="text-muted-foreground">—</span>
+                        {% endif %}
+                    </p>
+                    <p class="mt-3 text-xs text-muted-foreground">
+                        {% if analytics.dueDateCount > 0 %}
+                            {{ analytics.onTimeCount }} sur {{ analytics.dueDateCount }}
+                            ticket{{ analytics.dueDateCount > 1 ? 's' : '' }} terminé{{ analytics.dueDateCount > 1 ? 's' : '' }}
+                            avec une échéance.
+                        {% else %}
+                            Aucune échéance sur les tickets terminés.
+                        {% endif %}
+                    </p>
+                </div>
+
+                {# Répartition des tickets en cours #}
+                <div class="rounded-xl border bg-card p-5 shadow-sm">
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs font-medium text-muted-foreground">Tickets en cours</p>
+                        <span class="text-xs font-semibold tabular-nums text-muted-foreground">{{ analytics.openTotal }}</span>
+                    </div>
+
+                    {% if analytics.openTotal > 0 %}
+                        <div class="mt-4 space-y-3">
+                            {% for item in analytics.openByPriority %}
+                                <div>
+                                    <div class="flex items-center justify-between gap-2">
+                                        <twig:Badge variant="{{ item.priority.badgeVariant }}">{{ item.priority.label }}</twig:Badge>
+                                        <span class="text-xs font-medium tabular-nums">{{ item.count }}</span>
+                                    </div>
+                                    <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                                        <div class="h-full rounded-full bg-primary" style="width: {{ item.share }}%"></div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="mt-4 text-xs text-muted-foreground">Aucun ticket en cours.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Créations vs résolutions #}
+            <div class="mt-4 rounded-xl border bg-card p-5 shadow-sm">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h3 class="text-base font-semibold">Créés vs résolus</h3>
+                        <p class="mt-0.5 text-xs text-muted-foreground">8 dernières semaines.</p>
+                    </div>
+                    <div class="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span class="flex items-center gap-1.5">
+                            <span class="size-2.5 rounded-full bg-primary" aria-hidden="true"></span>
+                            Créés
+                        </span>
+                        <span class="flex items-center gap-1.5">
+                            <span class="size-2.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
+                            Résolus
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex items-end gap-2 sm:gap-3">
+                    {% for week in analytics.weeks %}
+                        <div class="flex min-w-0 flex-1 flex-col items-center gap-2">
+                            <div class="flex h-32 w-full items-end justify-center gap-1">
+                                <div class="w-2 rounded-t bg-primary sm:w-3"
+                                     style="height: {{ week.created > 0 ? (week.created / analytics.maxWeekly * 100) : 0 }}%"
+                                     title="{{ week.created }} créé{{ week.created > 1 ? 's' : '' }}"></div>
+                                <div class="w-2 rounded-t bg-emerald-500 sm:w-3"
+                                     style="height: {{ week.resolved > 0 ? (week.resolved / analytics.maxWeekly * 100) : 0 }}%"
+                                     title="{{ week.resolved }} résolu{{ week.resolved > 1 ? 's' : '' }}"></div>
+                            </div>
+                            <span class="text-[10px] tabular-nums text-muted-foreground">{{ week.start|date('d/m') }}</span>
+                            <span class="sr-only">{{ week.created }} créés, {{ week.resolved }} résolus</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
         {# ─── Derniers tickets + activité globale ─── #}
         <section class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 

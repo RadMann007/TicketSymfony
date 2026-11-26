@@ -64,11 +64,7 @@ class TicketRepository extends ServiceEntityRepository
     ): array {
         $qb = $this->createQueryBuilder('t');
 
-        if (!$seeAll) {
-            $qb->andWhere('(t.owner = :user OR t.assignedTo = :user)')
-                ->setParameter('user', $user);
-        }
-
+        $this->applyVisibility($qb, $user, $seeAll);
         $this->applySearch($qb, $q);
 
         if (null !== $priority) {
@@ -122,6 +118,20 @@ class TicketRepository extends ServiceEntityRepository
             $qb->andWhere('(t.name LIKE :q OR t.comment LIKE :q)')
                 ->setParameter('q', '%' . $q . '%');
         }
+    }
+
+    /**
+     * Restreint la requête aux tickets visibles par l'utilisateur, sauf si
+     * celui-ci peut tout voir (administrateur).
+     */
+    private function applyVisibility(QueryBuilder $qb, User $user, bool $seeAll): void
+    {
+        if ($seeAll) {
+            return;
+        }
+
+        $qb->andWhere('(t.owner = :user OR t.assignedTo = :user)')
+            ->setParameter('user', $user);
     }
 
     private function applySort(QueryBuilder $qb, string $sort): void
@@ -209,6 +219,45 @@ class TicketRepository extends ServiceEntityRepository
             ->setParameter('today', new DateTimeImmutable('today'))
             ->getQuery()
             ->getSingleScalarResult();
+    }
+
+    /**
+     * Tickets non terminés dont l'échéance est demain ou déjà passée.
+     *
+     * Les tickets dus aujourd'hui sont volontairement exclus : ils ont déjà
+     * fait l'objet du rappel de la veille.
+     *
+     * @return list<Ticket>
+     */
+    public function findDeadlineReminders(DateTimeImmutable $today): array
+    {
+        return $this->createQueryBuilder('t')
+            ->addSelect('o', 'a')
+            ->leftJoin('t.owner', 'o')
+            ->leftJoin('t.assignedTo', 'a')
+            ->andWhere('t.isDone = false')
+            ->andWhere('t.dueDate IS NOT NULL')
+            ->andWhere('t.dueDate < :today OR t.dueDate = :tomorrow')
+            ->setParameter('today', $today)
+            ->setParameter('tomorrow', $today->modify('+1 day'))
+            ->orderBy('t.dueDate', 'ASC')
+            ->addOrderBy('t.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Tickets visibles nécessaires au calcul des indicateurs du tableau de bord.
+     *
+     * @return list<Ticket>
+     */
+    public function findForAnalytics(User $user, bool $seeAll): array
+    {
+        $qb = $this->createQueryBuilder('t');
+
+        $this->applyVisibility($qb, $user, $seeAll);
+
+        return $qb->getQuery()->getResult();
     }
 
     public function countAll(): int
